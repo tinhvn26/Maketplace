@@ -2,6 +2,7 @@ import {
     ConflictException,
     Inject,
     Injectable,
+    UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { User } from '../interfaces/user.interface.js';
@@ -25,7 +26,10 @@ export class AuthService {
     login(_dto: LoginRequest) {
         return {
             message: 'Login flow chưa được triển khai',
-        };
+            accessToken: 'access-token-placeholder',
+            refreshToken: 'refresh-token-placeholder',
+            expiresIn: 600, 
+        };        
     }
 
     async register(request: RegisterRequest): Promise<UserProfileResponse> {
@@ -50,6 +54,12 @@ export class AuthService {
 
         const savedUser = await this.userRepository.create(user);
         return this.toUserProfileResponse(savedUser);
+    }
+
+    async logout() {
+        return {
+            message: 'Logout flow chưa được triển khai',
+        };
     }
 
     private toUserProfileResponse(user: User): UserProfileResponse {

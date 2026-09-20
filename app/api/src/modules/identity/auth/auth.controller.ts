@@ -14,7 +14,14 @@ export class AuthController {
   }
 
   @Post('register')
+  @HttpCode(201)
   register(@Body() request: RegisterRequest) {
     return this.authService.register(request);
+  }
+
+  @Post('logout')
+  @HttpCode(200)
+  logout() {
+    return this.authService.logout();
   }
 }
