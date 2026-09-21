@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { AuthController } from './auth/auth.controller.js';
-import { AuthService } from './auth/auth.service.js';
-import { InMemoryUserRepository } from './infrastructure/in-memory-user.repository.js';
-import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js';
-import { PASSWORD_HASHER } from './ports/password-hasher.js';
-import { USER_REPOSITORY } from './ports/user.repository.js';
+import { AuthController } from './presentation/http/auth.controller.js';
+import { AuthService } from './application/auth/auth.service.js';
+import { InMemoryUserRepository } from './infrastructure/persistence/in-memory-user.repository.js';
+import { ScryptPasswordHasher } from './infrastructure/providers/scrypt-password.hasher.js';
+import { PASSWORD_HASHER } from './application/ports/password-hasher.js';
+import { USER_REPOSITORY } from './application/ports/user.repository.js';
 
 @Module({
     imports: [],

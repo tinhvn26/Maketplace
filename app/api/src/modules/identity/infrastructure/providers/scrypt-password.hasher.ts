@@ -1,7 +1,7 @@
 import { randomBytes, scrypt as scryptCallback } from 'node:crypto';
 import { promisify } from 'node:util';
 import { Injectable } from '@nestjs/common';
-import type { PasswordHasher } from '../ports/password-hasher.js';
+import type { PasswordHasher } from '../../application/ports/password-hasher.js';
 
 const scrypt = promisify(scryptCallback);
 
