@@ -1,4 +1,4 @@
-import type { UserStatus } from '../../../../domain/value-objects/user-status.type.js';
+import type { UserStatus } from '../../../../domain/types/user-status.type.js';
 
 export class UserProfileResponse {
   id!: string;
