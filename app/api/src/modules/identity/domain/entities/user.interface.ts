@@ -1,4 +1,4 @@
-import type { UserStatus } from '../value-objects/user-status.type.js';
+import type { UserStatus } from '../types/user-status.type.js';
 
 export interface User {
   id: string;
