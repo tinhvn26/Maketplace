@@ -1,46 +1,71 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { User } from '../../domain/entities/user.js';
-import { PASSWORD_HASHER } from '../ports/password-hasher.js';
+import type { User } from '../../domain/entities/user.interface.js';
 import type { PasswordHasher } from '../ports/password-hasher.js';
-import { USER_REPOSITORY } from '../ports/user.repository.js';
+import { EmailAlreadyExistsError } from '../ports/user.repository.js';
 import type { UserRepository } from '../ports/user.repository.js';
-import type { LoginRequest } from '../../presentation/http/dto/auth/login.request.js';
-import type { RegisterRequest } from '../../presentation/http/dto/auth/register.request.js';
-import { UserProfileResponse } from '../../presentation/http/dto/users/user-profile.response.js';
+import type { TokenIssuer } from '../ports/token-issuer.js';
+import {
+  InvalidCredentialsError,
+  InvalidFullNameError,
+  InvalidRefreshTokenError,
+} from './auth.errors.js';
+import type { AuthTokens } from '../models/auth-tokens.js';
+import type { UserProfileResult } from '../users/user-profile.result.js';
+import type { LoginInput } from './login.input.js';
+import type { RegisterInput } from './register.input.js';
 
-@Injectable()
 export class AuthService {
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
-    @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasher,
+    private readonly tokenIssuer: TokenIssuer,
   ) {}
 
-  login(_dto: LoginRequest) {
-    return {
-      message: 'Login flow chưa được triển khai',
-      accessToken: 'access-token-placeholder',
-      refreshToken: 'refresh-token-placeholder',
-      expiresIn: 600,
-    };
+  async login(input: LoginInput): Promise<AuthTokens> {
+    const email = input.email.trim().toLowerCase();
+    const user = await this.userRepository.findByEmail(email);
+
+    // Chỉ cho phép tài khoản đang hoạt động đăng nhập.
+    if (!user || user.status !== 'ACTIVE') {
+      throw new InvalidCredentialsError();
+    }
+
+    const isValid = await this.passwordHasher.verify(
+      input.password,
+      user.passwordHash,
+    );
+
+    if (!isValid) {
+      throw new InvalidCredentialsError();
+    }
+
+    return this.tokenIssuer.issue(user.id);
   }
 
-  async register(request: RegisterRequest): Promise<UserProfileResponse> {
-    const emailNormalized = request.email.trim().toLowerCase();
+  async register(input: RegisterInput): Promise<UserProfileResult> {
+    const fullName = input.fullName.trim();
+    const emailNormalized = input.email.trim().toLowerCase();
+
+    // Bảo vệ cả khi service được gọi ngoài HTTP.
+    if (!fullName) {
+      throw new InvalidFullNameError();
+    }
+
+    // Kiểm tra sớm để tránh hash mật khẩu nếu email đã tồn tại.
     const existingUser = await this.userRepository.findByEmail(emailNormalized);
 
     if (existingUser) {
-      throw new ConflictException('Email đã được sử dụng');
+      throw new EmailAlreadyExistsError();
     }
 
+    const passwordHash = await this.passwordHasher.hash(input.password);
     const now = new Date();
+
     const user: User = {
       id: randomUUID(),
-      fullName: request.fullName.trim(),
+      fullName,
       emailNormalized,
-      passwordHash: await this.passwordHasher.hash(request.password),
+      passwordHash,
       status: 'ACTIVE',
       createdAt: now,
       updatedAt: now,
@@ -48,21 +73,33 @@ export class AuthService {
     };
 
     const savedUser = await this.userRepository.create(user);
-    return this.toUserProfileResponse(savedUser);
+    return this.toUserProfileResult(savedUser);
   }
 
-  async logout() {
-    return { message: 'Logout flow chưa được triển khai' };
+  async refresh(refreshToken: string): Promise<AuthTokens> {
+    const userId = await this.tokenIssuer.verifyRefreshToken(refreshToken);
+    if (!userId) throw new InvalidRefreshTokenError();
+    const user = await this.userRepository.findById(userId);
+    if (!user || user.status !== 'ACTIVE' || user.deletedAt !== null) {
+      throw new InvalidRefreshTokenError();
+    }
+    const { accessToken, expiresIn } = await this.tokenIssuer.issueAccessToken(user.id);
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      expiresIn,
+    };
   }
 
-  private toUserProfileResponse(user: User): UserProfileResponse {
+  private toUserProfileResult(user: User): UserProfileResult {
     return {
       id: user.id,
       fullName: user.fullName,
       email: user.emailNormalized,
       status: user.status,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
   }
 }
