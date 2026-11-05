@@ -1,21 +1,23 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateProfileDto {
-  @IsOptional()
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   fullName?: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  password?: string;
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  @MaxLength(2048)
+  avatarUrl?: string | null;
 }
