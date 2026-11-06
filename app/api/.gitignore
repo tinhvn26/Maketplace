@@ -21,6 +21,11 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/src/platform/database/generated/
+/prisma/*.db
+/prisma/*.db-*
+/dev.db
+/dev.db-*
 
 # IDEs and editors
 /.idea
@@ -50,6 +55,7 @@ lerna-debug.log*
 .tmp
 
 # Runtime data
+/var/media/
 pids
 *.pid
 *.seed

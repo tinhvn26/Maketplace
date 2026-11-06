@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "postinstall": "prisma generate",
     "build": "nest build",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -19,7 +20,13 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "benchmark:catalog": "node scripts/benchmark-catalog.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "identity:bootstrap-admin": "npm run build && node dist/modules/identity/infrastructure/cli/bootstrap-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -32,8 +39,11 @@
     "@prisma/client": "^7.10.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "nodemailer": "^10.0.13",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sharp": "^0.35.5",
+    "validator": "13.15.35"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",
@@ -43,6 +53,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
     "@types/supertest": "^7.0.0",
+    "@types/validator": "13.15.10",
     "@vitest/coverage-v8": "^4.1.2",
     "dotenv": "^18.0.3",
     "oxlint": "^1.58.0",
@@ -54,5 +65,8 @@
     "typescript": "^6.0.2",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
   }
 }
