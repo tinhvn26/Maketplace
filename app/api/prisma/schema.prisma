@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/platform/database/generated"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id              String          @id
+  fullName        String
+  emailNormalized String          @unique
+  passwordHash    String
+  avatarUrl       String?
+  status          String          @default("ACTIVE")
+  role            String          @default("USER")
+  emailVerifiedAt DateTime?
+  authVersion     Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+  sessions        AuthSession[]
+  accountActions  AccountAction[]
+  shops           Shop[]
+
+  @@index([deletedAt])
+  @@index([role, status, deletedAt])
+}
+
+model AuthSession {
+  id               String    @id
+  userId           String
+  authVersion      Int
+  refreshTokenHash String
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime  @default(now())
+  revokedAt        DateTime?
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([expiresAt])
+}
+
+model AccountAction {
+  id              String         @id
+  userId          String
+  purpose         String
+  tokenHash       String         @unique
+  attempts        Int            @default(0)
+  emailNormalized String
+  authVersion     Int
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mails           IdentityMail[]
+
+  @@index([userId, purpose, createdAt])
+  @@index([expiresAt])
+}
+
+model IdentityMail {
+  id          String         @id
+  actionId    String?
+  to          String
+  subject     String
+  text        String
+  createdAt   DateTime       @default(now())
+  availableAt DateTime       @default(now())
+  expiresAt   DateTime
+  attempts    Int            @default(0)
+  sentAt      DateTime?
+  lockedUntil DateTime?
+  lastError   String?
+  action      AccountAction? @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([sentAt, availableAt])
+  @@index([actionId])
+}
+
+model RateLimitBucket {
+  key     String @id
+  count   Int
+  resetAt BigInt
+
+  @@index([resetAt])
+}
+
+model CatalogCategory {
+  id                   String            @id
+  name                 String
+  slug                 String            @unique
+  version              Int               @default(0)
+  createdAt            DateTime          @default(now())
+  parentId             String?
+  attributeDefinitions Json              @default("[]")
+  parent               CatalogCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children             CatalogCategory[] @relation("CategoryTree")
+  products             CatalogProduct[]
+
+  @@index([parentId])
+}
+
+model CatalogProduct {
+  id             String           @id
+  categoryId     String
+  shopId         String?
+  brandId        String?
+  searchText     String           @default("")
+  name           String
+  slug           String           @unique
+  description    String           @default("")
+  images         Json             @default("[]")
+  minPriceAmount Int?
+  status         String           @default("DRAFT")
+  version        Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  publishedAt    DateTime?
+  category       CatalogCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  shop           Shop?            @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  brand          CatalogBrand?    @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  variants       CatalogVariant[]
+  reviews        CatalogReview[]
+
+  @@index([status, createdAt, id])
+  @@index([categoryId, status])
+  @@index([status, minPriceAmount, createdAt, id])
+  @@index([shopId, status, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([categoryId, status, createdAt(sort: Desc), id(sort: Desc)], map: "CatalogProduct_category_status_createdAt_id_idx")
+  @@index([brandId, status])
+  @@index([status, name, id(sort: Desc)])
+  @@index([status, minPriceAmount, createdAt(sort: Desc), id(sort: Desc)], map: "CatalogProduct_price_asc_idx")
+  @@index([brandId, status, createdAt(sort: Desc), id(sort: Desc)], map: "CatalogProduct_brand_browse_idx")
+}
+
+model CatalogVariant {
+  id          String         @id
+  productId   String
+  sku         String         @unique
+  name        String
+  priceAmount Int
+  currency    String         @default("VND")
+  isActive    Boolean        @default(true)
+  attributes  Json           @default("{}")
+  images      Json           @default("[]")
+  product     CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, isActive])
+}
+
+model Shop {
+  id        String           @id
+  name      String
+  slug      String           @unique
+  ownerId   String
+  status    String           @default("ACTIVE")
+  version   Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  owner     User             @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  products  CatalogProduct[]
+
+  @@index([ownerId, status])
+}
+
+model MediaAsset {
+  id         String       @id
+  shopId     String?
+  ownerId    String
+  status     String       @default("READY")
+  storageKey String       @unique
+  mimeType   String
+  byteSize   Int
+  width      Int
+  height     Int
+  createdAt  DateTime     @default(now())
+  usages     MediaUsage[]
+
+  @@index([shopId, status, createdAt])
+}
+
+model MediaUsage {
+  assetId    String
+  resourceId String
+  kind       String     @default("CATALOG_PRODUCT")
+  asset      MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@id([assetId, kind, resourceId])
+  @@index([kind, resourceId])
+}
+
+model CatalogBrand {
+  id        String           @id
+  name      String
+  slug      String           @unique
+  version   Int              @default(0)
+  createdAt DateTime         @default(now())
+  products  CatalogProduct[]
+}
+
+model CatalogReview {
+  id          String         @id
+  productId   String
+  baseVersion Int
+  version     Int            @default(0)
+  status      String         @default("DRAFT")
+  snapshot    Json
+  submittedBy String?
+  reviewedBy  String?
+  note        String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  product     CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt, id])
+  @@index([productId, createdAt])
+}
+
+model CatalogAudit {
+  id         String   @id
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  shopId     String?
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt, id])
+  @@index([shopId, createdAt, id])
+}
