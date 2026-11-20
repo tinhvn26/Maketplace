@@ -29,7 +29,7 @@ describe('PrismaMediaRepository live authorization and usage transactions', () =
   const otherId = '22222222-2222-4222-8222-222222222222';
   const shopId = '33333333-3333-4333-8333-333333333333';
   const id = '44444444-4444-4444-8444-444444444444';
-  const actor = { userId: ownerId, role: 'USER' as const };
+  const actor = { userId: ownerId, role: 'CUSTOMER' as const };
   const asset = (): MediaAsset => ({
     id,
     shopId,
@@ -180,7 +180,7 @@ describe('PrismaMediaRepository live authorization and usage transactions', () =
     });
     await prisma.user.update({
       where: { id: ownerId },
-      data: { role: 'USER' },
+      data: { role: 'CUSTOMER' },
     });
     await expect(
       repository.create({ ...asset(), shopId: null }, admin),

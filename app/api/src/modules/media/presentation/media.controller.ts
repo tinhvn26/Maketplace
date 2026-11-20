@@ -29,7 +29,7 @@ import { MediaExceptionFilter } from './media-exception.filter.js';
 
 class UploadMediaRequest {
   @ValidateIf((_object, value) => value !== undefined)
-  @IsUUID('4')
+  @IsUUID('4', { message: 'shopId phải là UUID phiên bản 4 hợp lệ.' })
   shopId?: string;
 }
 
@@ -74,7 +74,9 @@ export class MediaController {
   private actor(request: AuthenticatedRequest): MediaActor {
     if (
       !request.userId ||
-      (request.role !== 'ADMIN' && request.role !== 'USER')
+      (request.role !== 'ADMIN' &&
+        request.role !== 'EMPLOYER' &&
+        request.role !== 'CUSTOMER')
     )
       throw new UnauthorizedException();
     return { userId: request.userId, role: request.role };

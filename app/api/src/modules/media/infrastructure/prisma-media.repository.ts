@@ -82,7 +82,7 @@ export class PrismaMediaRepository implements MediaRepository {
       user.status !== 'ACTIVE' ||
       user.deletedAt !== null ||
       user.role !== actor.role ||
-      !['USER', 'ADMIN'].includes(user.role)
+      !['ADMIN', 'EMPLOYER', 'CUSTOMER'].includes(user.role)
     )
       throw new MediaForbiddenError(
         'An active account with current privileges is required',
@@ -107,7 +107,7 @@ export class PrismaMediaRepository implements MediaRepository {
       shop.status !== 'ACTIVE' ||
       shop.owner.status !== 'ACTIVE' ||
       shop.owner.deletedAt !== null ||
-      !['USER', 'ADMIN'].includes(shop.owner.role)
+      !['ADMIN', 'EMPLOYER', 'CUSTOMER'].includes(shop.owner.role)
     )
       throw new ShopUnavailableError();
   }

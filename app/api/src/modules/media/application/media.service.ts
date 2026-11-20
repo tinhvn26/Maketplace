@@ -136,7 +136,7 @@ export class MediaService implements MediaAssets {
       !actor ||
       typeof actor.userId !== 'string' ||
       !actor.userId ||
-      !['USER', 'ADMIN'].includes(actor.role)
+      !['ADMIN', 'EMPLOYER', 'CUSTOMER'].includes(actor.role)
     ) {
       throw new MediaForbiddenError('An authenticated actor is required');
     }

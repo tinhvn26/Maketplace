@@ -2,7 +2,7 @@ export const MEDIA_ASSETS = Symbol('MEDIA_ASSETS');
 
 export interface MediaActor {
   userId: string;
-  role: 'USER' | 'ADMIN';
+  role: 'ADMIN' | 'EMPLOYER' | 'CUSTOMER';
 }
 
 export interface ResolvedMediaAsset {
