@@ -1,15 +1,15 @@
 import { IsNumber, IsString } from 'class-validator';
 
 export class AuthTokenResponse {
-  @IsString()
+  @IsString({ message: 'accessToken phải là chuỗi ký tự' })
   accessToken!: string;
 
-  @IsString()
+  @IsString({ message: 'refreshToken phải là chuỗi ký tự' })
   refreshToken!: string;
 
-  @IsString()
+  @IsString({ message: 'tokenType phải là chuỗi ký tự' })
   tokenType!: 'Bearer';
 
-  @IsNumber()
+  @IsNumber({}, { message: 'expiresIn phải là số hợp lệ' })
   expiresIn!: number;
 }
