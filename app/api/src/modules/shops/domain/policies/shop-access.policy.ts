@@ -7,12 +7,14 @@ export interface ShopAccountState {
 
 export function isActiveShopAccount(
   user: ShopAccountState | null,
-): user is ShopAccountState & { role: 'USER' | 'ADMIN' } {
+): user is ShopAccountState & { role: 'ADMIN' | 'EMPLOYER' | 'CUSTOMER' } {
   return (
     user !== null &&
     user.status === 'ACTIVE' &&
     user.deletedAt === null &&
-    (user.role === 'USER' || user.role === 'ADMIN')
+    (user.role === 'ADMIN' ||
+      user.role === 'EMPLOYER' ||
+      user.role === 'CUSTOMER')
   );
 }
 

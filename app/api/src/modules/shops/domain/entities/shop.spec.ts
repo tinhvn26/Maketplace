@@ -128,25 +128,32 @@ describe('Shop domain', () => {
     },
   );
 
-  it('allows only live owners and administrators to manage a shop', () => {
-    const owner = {
-      id: input.ownerId,
-      role: 'USER',
-      status: 'ACTIVE',
-      deletedAt: null,
-    };
-    expect(mayManageShop(input.ownerId, owner)).toBe(true);
-    expect(mayManageShop(input.ownerId, { ...owner, id: 'other' })).toBe(false);
-    expect(
-      mayManageShop(input.ownerId, { ...owner, id: 'admin', role: 'ADMIN' }),
-    ).toBe(true);
-    expect(mayManageShop(input.ownerId, { ...owner, status: 'LOCKED' })).toBe(
-      false,
-    );
-    expect(mayManageShop(input.ownerId, { ...owner, deletedAt: now })).toBe(
-      false,
-    );
-    expect(isActiveShopAccount({ ...owner, role: 'UNSUPPORTED' })).toBe(false);
-    expect(isActiveShopAccount(null)).toBe(false);
-  });
+  it.each(['CUSTOMER', 'EMPLOYER'] as const)(
+    'allows a live %s owner to manage only their own shop',
+    (role) => {
+      const owner = {
+        id: input.ownerId,
+        role,
+        status: 'ACTIVE',
+        deletedAt: null,
+      };
+      expect(mayManageShop(input.ownerId, owner)).toBe(true);
+      expect(mayManageShop(input.ownerId, { ...owner, id: 'other' })).toBe(
+        false,
+      );
+      expect(
+        mayManageShop(input.ownerId, { ...owner, id: 'admin', role: 'ADMIN' }),
+      ).toBe(true);
+      expect(mayManageShop(input.ownerId, { ...owner, status: 'LOCKED' })).toBe(
+        false,
+      );
+      expect(mayManageShop(input.ownerId, { ...owner, deletedAt: now })).toBe(
+        false,
+      );
+      expect(isActiveShopAccount({ ...owner, role: 'UNSUPPORTED' })).toBe(
+        false,
+      );
+      expect(isActiveShopAccount(null)).toBe(false);
+    },
+  );
 });

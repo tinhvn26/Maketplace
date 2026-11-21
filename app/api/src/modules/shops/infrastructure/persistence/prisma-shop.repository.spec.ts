@@ -25,7 +25,7 @@ describe('PrismaShopRepository security transactions', () => {
   let prisma: PrismaService;
   let repository: PrismaShopRepository;
   let directory: string;
-  const actor = { userId: 'owner', role: 'USER' as const };
+  const actor = { userId: 'owner', role: 'CUSTOMER' as const };
   const administrator = { userId: 'admin', role: 'ADMIN' as const };
   const now = new Date('2026-11-03T03:00:00Z');
 
@@ -67,14 +67,14 @@ describe('PrismaShopRepository security transactions', () => {
           emailNormalized: 'owner@example.com',
           fullName: 'Owner',
           passwordHash: 'hash',
-          role: 'USER',
+          role: 'CUSTOMER',
         },
         {
           id: 'other',
           emailNormalized: 'other@example.com',
           fullName: 'Other',
           passwordHash: 'hash',
-          role: 'USER',
+          role: 'CUSTOMER',
         },
         {
           id: 'admin',
@@ -152,7 +152,7 @@ describe('PrismaShopRepository security transactions', () => {
     await repository.requireAdministrator(administrator);
     await prisma.user.update({
       where: { id: administrator.userId },
-      data: { role: 'USER' },
+      data: { role: 'CUSTOMER' },
     });
     await expect(
       repository.saveStatus({ ...shop, status: 'SUSPENDED' }, 0, administrator),

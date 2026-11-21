@@ -2,7 +2,7 @@ export const SHOP_ACCESS = Symbol('SHOP_ACCESS');
 
 export interface ShopActor {
   userId: string;
-  role: 'USER' | 'ADMIN';
+  role: 'ADMIN' | 'EMPLOYER' | 'CUSTOMER';
 }
 
 export interface ShopAccess {

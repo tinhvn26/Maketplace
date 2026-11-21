@@ -9,7 +9,7 @@ import {
 } from '../domain/errors/shop.errors.js';
 
 function setup() {
-  const actor = { userId: 'owner', role: 'USER' as const };
+  const actor = { userId: 'owner', role: 'CUSTOMER' as const };
   const now = new Date('2026-11-03T01:00:00Z');
   const shop = createShop({
     id: 'shop-one',

@@ -55,7 +55,7 @@ export class PrismaShopRepository implements ShopRepository {
         owner: {
           status: 'ACTIVE',
           deletedAt: null,
-          role: { in: ['USER', 'ADMIN'] },
+          role: { in: ['ADMIN', 'EMPLOYER', 'CUSTOMER'] },
         },
       },
     });
@@ -81,7 +81,7 @@ export class PrismaShopRepository implements ShopRepository {
         owner: {
           status: 'ACTIVE',
           deletedAt: null,
-          role: { in: ['USER', 'ADMIN'] },
+          role: { in: ['ADMIN', 'EMPLOYER', 'CUSTOMER'] },
         },
       },
       select: { id: true },
