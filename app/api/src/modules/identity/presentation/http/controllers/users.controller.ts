@@ -48,6 +48,7 @@ export class UsersController {
   ): Promise<UserProfileResponse> {
     const result = await this.usersService.updateProfile(userId, {
       fullName: request.fullName,
+      phoneNumber: request.phoneNumber,
       avatarUrl: request.avatarUrl,
     });
 

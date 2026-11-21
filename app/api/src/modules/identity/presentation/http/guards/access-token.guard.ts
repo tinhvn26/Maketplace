@@ -5,11 +5,15 @@ import { TOKEN_ISSUER } from '../../../application/ports/token-issuer.js';
 import type { TokenIssuer } from '../../../application/ports/token-issuer.js';
 import { SESSION_REPOSITORY } from '../../../application/ports/session.repository.js';
 import type { SessionRepository } from '../../../application/ports/session.repository.js';
+import {
+  isUserRole,
+  type UserRole,
+} from '../../../domain/types/user-role.types.js';
 
 export interface AuthenticatedRequest extends Request {
   userId?: string;
   sessionId?: string;
-  role?: 'USER' | 'ADMIN';
+  role?: UserRole;
 }
 
 @Injectable()
@@ -44,7 +48,7 @@ export class AccessTokenGuard implements CanActivate {
       subject.userId,
       new Date(),
     );
-    if (!active) {
+    if (!active || !isUserRole(active.role)) {
       throw new UnauthorizedException('Session is invalid or expired');
     }
 

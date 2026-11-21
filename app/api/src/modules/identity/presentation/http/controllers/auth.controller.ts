@@ -55,6 +55,7 @@ export class AuthController {
       fullName: request.fullName,
       email: request.email,
       password: request.password,
+      phoneNumber: request.phoneNumber,
       avatarUrl: request.avatarUrl,
     });
 
