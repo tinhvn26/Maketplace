@@ -3,7 +3,7 @@ import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import {
   afterAll,
   beforeAll,
@@ -28,24 +28,40 @@ describe('PrismaUserRepository account security transactions', () => {
   let repository: PrismaUserRepository;
   let databaseDirectory: string;
   let user: User;
+  let migratedProfile: {
+    users: Array<{ id: string; phoneNumber: string | null }>;
+    profiles: Array<{
+      userId: string;
+      avatarUrl: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    sessionUserId: string;
+    shopOwnerId: string;
+    userColumns: string[];
+    foreignKeyErrors: unknown[];
+  };
 
-  async function createUser(role: 'ADMIN' | 'USER' = 'USER'): Promise<User> {
+  async function createUser(
+    role: 'ADMIN' | 'CUSTOMER' = 'CUSTOMER',
+  ): Promise<User> {
     const id = randomUUID();
     const now = new Date();
-    return repository.create({
+    const account: User = {
       id,
       fullName: role === 'ADMIN' ? 'Administrator' : 'Customer',
       emailNormalized: `${id}@example.com`,
       passwordHash: 'original-hash',
-      avatarUrl: null,
-      status: 'ACTIVE',
+      phoneNumber: null,
       role,
+      status: 'ACTIVE',
       emailVerifiedAt: null,
       authVersion: 0,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
-    });
+    };
+    return (await repository.create(account, { avatarUrl: null })).user;
   }
 
   async function createSession(userId: string) {
@@ -76,6 +92,20 @@ describe('PrismaUserRepository account security transactions', () => {
       for (const migration of migrations
         .filter((item) => item.isDirectory())
         .sort((a, b) => a.name.localeCompare(b.name))) {
+        if (migration.name === '20261106000000_separate_user_profile') {
+          await connection.executeScript(`
+            INSERT INTO "User"
+              ("id", "fullName", "emailNormalized", "passwordHash", "avatarUrl", "createdAt", "updatedAt", "deletedAt")
+            VALUES
+              ('legacy-owner', 'Legacy Owner', 'legacy-owner@example.com', 'legacy-hash', 'https://example.com/avatar.png', '2021-01-02T03:04:05.000Z', '2022-02-03T04:05:06.000Z', NULL),
+              ('legacy-deleted', 'Deleted Owner', 'legacy-deleted@example.com', 'deleted-hash', NULL, '2021-01-02T03:04:05.000Z', '2022-02-03T04:05:06.000Z', '2023-03-04T05:06:07.000Z');
+            INSERT INTO "AuthSession"
+              ("id", "userId", "authVersion", "refreshTokenHash", "expiresAt")
+            VALUES ('legacy-session', 'legacy-owner', 0, 'legacy-refresh-hash', '2100-01-01T00:00:00.000Z');
+            INSERT INTO "Shop" ("id", "name", "slug", "ownerId", "updatedAt")
+            VALUES ('legacy-shop', 'Legacy Shop', 'legacy-shop', 'legacy-owner', '2022-02-03T04:05:06.000Z');
+          `);
+        }
         await connection.executeScript(
           await readFile(
             new URL(`${migration.name}/migration.sql`, directory),
@@ -89,9 +119,38 @@ describe('PrismaUserRepository account security transactions', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     repository = new PrismaUserRepository(prisma);
+    migratedProfile = {
+      users: await prisma.user.findMany({
+        select: { id: true, phoneNumber: true },
+        orderBy: { id: 'asc' },
+      }),
+      profiles: await prisma.userProfile.findMany({
+        orderBy: { userId: 'asc' },
+      }),
+      sessionUserId: (
+        await prisma.authSession.findUniqueOrThrow({
+          where: { id: 'legacy-session' },
+        })
+      ).userId,
+      shopOwnerId: (
+        await prisma.shop.findUniqueOrThrow({
+          where: { id: 'legacy-shop' },
+        })
+      ).ownerId,
+      userColumns: (
+        await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+          'PRAGMA table_info("User")',
+        )
+      ).map((column) => column.name),
+      foreignKeyErrors: await prisma.$queryRawUnsafe(
+        'PRAGMA foreign_key_check',
+      ),
+    };
   });
 
   beforeEach(async () => {
+    await prisma.shop.deleteMany();
+    await prisma.identityMail.deleteMany();
     await prisma.authSession.deleteMany();
     await prisma.user.deleteMany();
     user = await createUser();
@@ -102,36 +161,318 @@ describe('PrismaUserRepository account security transactions', () => {
   afterAll(async () => {
     await prisma?.$disconnect();
     vi.unstubAllEnvs();
-    if (databaseDirectory)
-      await rm(databaseDirectory, { recursive: true, force: true });
+    if (databaseDirectory) {
+      const target = resolve(databaseDirectory);
+      if (
+        !target.startsWith(resolve(tmpdir()) + sep) ||
+        !target.includes('marketplate-accounts-')
+      ) {
+        throw new Error(
+          'Refusing to remove a directory outside the test workspace',
+        );
+      }
+      await rm(target, { recursive: true, force: true });
+    }
   });
 
-  it.each(['occupied', 'stale-password', 'foreign-session', 'revoked-session', 'expired-session'])(
+  it('migrates every legacy avatar and timestamp without losing user, session or shop references', () => {
+    const createdAt = new Date('2021-01-02T03:04:05.000Z');
+    const updatedAt = new Date('2022-02-03T04:05:06.000Z');
+    expect(migratedProfile.users).toEqual([
+      { id: 'legacy-deleted', phoneNumber: null },
+      { id: 'legacy-owner', phoneNumber: null },
+    ]);
+    expect(migratedProfile.profiles).toEqual([
+      { userId: 'legacy-deleted', avatarUrl: null, createdAt, updatedAt },
+      {
+        userId: 'legacy-owner',
+        avatarUrl: 'https://example.com/avatar.png',
+        createdAt,
+        updatedAt,
+      },
+    ]);
+    expect(migratedProfile.sessionUserId).toBe('legacy-owner');
+    expect(migratedProfile.shopOwnerId).toBe('legacy-owner');
+    expect(migratedProfile.userColumns).toContain('phoneNumber');
+    expect(migratedProfile.userColumns).not.toContain('avatarUrl');
+    expect(migratedProfile.foreignKeyErrors).toEqual([]);
+  });
+
+  it('rolls back every profile migration step if a legacy view prevents dropping avatarUrl', async () => {
+    const failureUrl = `file:${join(databaseDirectory, 'migration-failure.db').replaceAll('\\', '/')}`;
+    const connection = await new PrismaBetterSqlite3({
+      url: failureUrl,
+    }).connect();
+    try {
+      const directory = new URL(
+        '../../../../../prisma/migrations/',
+        import.meta.url,
+      );
+      const migrations = (await readdir(directory, { withFileTypes: true }))
+        .filter((entry) => entry.isDirectory())
+        .sort((left, right) => left.name.localeCompare(right.name));
+      for (const migration of migrations) {
+        if (migration.name === '20261106000000_separate_user_profile') break;
+        await connection.executeScript(
+          await readFile(
+            new URL(`${migration.name}/migration.sql`, directory),
+            'utf8',
+          ),
+        );
+      }
+      await connection.executeScript(`
+        INSERT INTO "User" ("id", "fullName", "emailNormalized", "passwordHash", "avatarUrl", "updatedAt")
+        VALUES ('legacy-view-user', 'Legacy Owner', 'legacy-view@example.com', 'legacy-hash', 'https://example.com/legacy.png', CURRENT_TIMESTAMP);
+        CREATE VIEW "LegacyAvatarView" AS SELECT id, avatarUrl FROM "User";
+      `);
+      const migration = await readFile(
+        new URL(
+          '20261106000000_separate_user_profile/migration.sql',
+          directory,
+        ),
+        'utf8',
+      );
+      await expect(async () => {
+        await connection.executeScript(migration);
+      }).rejects.toThrow();
+      // executeScript leaves SQLite's failed explicit transaction open. The
+      // migration engine closes its connection; the manual adapter needs rollback.
+      await connection.executeScript('ROLLBACK;');
+      const tables = await connection.queryRaw({
+        sql: `SELECT "name" FROM "sqlite_master" WHERE "type" = 'table' AND "name" = 'UserProfile'`,
+        args: [],
+        argTypes: [],
+      });
+      expect(tables.rows).toEqual([]);
+      const columns = await connection.queryRaw({
+        sql: 'PRAGMA table_info("User")',
+        args: [],
+        argTypes: [],
+      });
+      expect(columns.rows.map((row) => row[1])).toContain('avatarUrl');
+      expect(columns.rows.map((row) => row[1])).not.toContain('phoneNumber');
+      const legacy = await connection.queryRaw({
+        sql: 'SELECT "avatarUrl" FROM "LegacyAvatarView" WHERE "id" = ?',
+        args: ['legacy-view-user'],
+        argTypes: [{ scalarType: 'string', dbType: 'TEXT', arity: 'scalar' }],
+      });
+      expect(legacy.rows).toEqual([['https://example.com/legacy.png']]);
+    } finally {
+      await connection.dispose();
+    }
+  });
+
+  it('maps account fields separately from its profile projection', async () => {
+    const result = await repository.updateProfile(user.id, {
+      phoneNumber: '+84901234567',
+      avatarUrl: 'https://example.com/avatar.png',
+    });
+    expect(result?.user.phoneNumber).toBe('+84901234567');
+    expect(result?.avatarUrl).toBe('https://example.com/avatar.png');
+    expect(result?.profileUpdatedAt).toBeInstanceOf(Date);
+    const credentialUser = await repository.findByEmail(user.emailNormalized);
+    expect(credentialUser).toMatchObject({
+      id: user.id,
+      phoneNumber: '+84901234567',
+    });
+    expect(credentialUser).not.toHaveProperty('avatarUrl');
+    expect((await repository.findProfileById(user.id))?.avatarUrl).toBe(
+      result?.avatarUrl,
+    );
+  });
+
+  it('rolls back account creation if nested profile creation fails', async () => {
+    const id = randomUUID();
+    const now = new Date();
+    const account: User = {
+      id,
+      fullName: 'New Customer',
+      emailNormalized: `${id}@example.com`,
+      passwordHash: 'hash',
+      phoneNumber: null,
+      role: 'CUSTOMER',
+      status: 'ACTIVE',
+      emailVerifiedAt: null,
+      authVersion: 0,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    await prisma.$executeRawUnsafe(
+      "CREATE TRIGGER prevent_profile_creation BEFORE INSERT ON UserProfile BEGIN SELECT RAISE(ABORT, 'test profile failure'); END",
+    );
+    try {
+      await expect(
+        repository.create(account, { avatarUrl: null }),
+      ).rejects.toThrow();
+      expect(await prisma.user.findUnique({ where: { id } })).toBeNull();
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER prevent_profile_creation');
+    }
+  });
+
+  it('changes avatar without mutating account credentials, timestamps or sessions', async () => {
+    const before = await repository.findById(user.id);
+    await repository.updateProfile(user.id, {
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
+      avatarUrl: 'https://example.com/new-avatar.png',
+    });
+    expect(await repository.findById(user.id)).toEqual(before);
+    expect(
+      await prisma.authSession.count({
+        where: { userId: user.id, revokedAt: null },
+      }),
+    ).toBe(2);
+    expect((await repository.findProfileById(user.id))?.avatarUrl).toBe(
+      'https://example.com/new-avatar.png',
+    );
+  });
+
+  it('preserves omitted profile fields and clears explicitly nullable fields without changing authVersion', async () => {
+    await repository.updateProfile(user.id, {
+      phoneNumber: '+84901234567',
+      avatarUrl: 'https://example.com/avatar.png',
+    });
+    const renamed = await repository.updateProfile(user.id, {
+      fullName: 'Renamed Customer',
+    });
+    expect(renamed?.user).toMatchObject({
+      fullName: 'Renamed Customer',
+      phoneNumber: '+84901234567',
+      authVersion: 0,
+    });
+    expect(renamed?.avatarUrl).toBe('https://example.com/avatar.png');
+    const cleared = await repository.updateProfile(user.id, {
+      phoneNumber: null,
+      avatarUrl: null,
+    });
+    expect(cleared?.user).toMatchObject({
+      fullName: 'Renamed Customer',
+      phoneNumber: null,
+      authVersion: 0,
+    });
+    expect(cleared?.avatarUrl).toBeNull();
+  });
+
+  it('rolls back account name and phone when the profile write fails', async () => {
+    const before = await repository.findById(user.id);
+    await prisma.$executeRawUnsafe(
+      "CREATE TRIGGER prevent_profile_change BEFORE UPDATE ON UserProfile BEGIN SELECT RAISE(ABORT, 'test profile failure'); END",
+    );
+    try {
+      await expect(
+        repository.updateProfile(user.id, {
+          fullName: 'Must Roll Back',
+          phoneNumber: '+84901234567',
+          avatarUrl: 'https://example.com/failed.png',
+        }),
+      ).rejects.toThrow();
+      expect(await repository.findById(user.id)).toEqual(before);
+      expect((await repository.findProfileById(user.id))?.avatarUrl).toBeNull();
+    } finally {
+      await prisma.$executeRawUnsafe('DROP TRIGGER prevent_profile_change');
+    }
+  });
+
+  it('provides null profile defaults for accounts without a profile row and rejects unavailable profile writes', async () => {
+    await prisma.userProfile.delete({ where: { userId: user.id } });
+    expect(await repository.findProfileById(user.id)).toMatchObject({
+      avatarUrl: null,
+      profileUpdatedAt: null,
+    });
+    await repository.updateProfile(user.id, {
+      avatarUrl: 'https://example.com/recreated.png',
+    });
+    expect((await repository.findProfileById(user.id))?.avatarUrl).toBe(
+      'https://example.com/recreated.png',
+    );
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { status: 'LOCKED' },
+    });
+    expect(
+      await repository.updateProfile(user.id, {
+        fullName: 'Must Not Change',
+        avatarUrl: null,
+      }),
+    ).toBeNull();
+    expect((await repository.findProfileById(user.id))?.avatarUrl).toBe(
+      'https://example.com/recreated.png',
+    );
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { deletedAt: new Date() },
+    });
+    expect(await repository.findProfileById(user.id)).toBeNull();
+  });
+
+  it.each([
+    'occupied',
+    'stale-password',
+    'foreign-session',
+    'revoked-session',
+    'expired-session',
+  ])(
     'rolls back the email and session versions when an email change fails: %s',
     async (reason) => {
       const other = await createUser();
-      const session = await createSession(reason === 'foreign-session' ? other.id : user.id);
+      const session = await createSession(
+        reason === 'foreign-session' ? other.id : user.id,
+      );
       if (reason === 'revoked-session' || reason === 'expired-session') {
         await prisma.authSession.update({
           where: { id: session.id },
-          data: reason === 'revoked-session'
-            ? { revokedAt: new Date() }
-            : { expiresAt: new Date(0) },
+          data:
+            reason === 'revoked-session'
+              ? { revokedAt: new Date() }
+              : { expiresAt: new Date(0) },
         });
       }
-      const before = await prisma.authSession.findUniqueOrThrow({ where: { id: session.id } });
-      await expect(repository.changeEmail(user.id, {
-        sessionId: session.id,
-        emailNormalized: reason === 'occupied' ? other.emailNormalized : 'new@example.com',
-        expectedPasswordHash: reason === 'stale-password' ? 'stale-hash' : user.passwordHash,
-        expectedAuthVersion: user.authVersion,
-      })).rejects.toThrow();
+      const before = await prisma.authSession.findUniqueOrThrow({
+        where: { id: session.id },
+      });
+      await expect(
+        repository.changeEmail(user.id, {
+          sessionId: session.id,
+          emailNormalized:
+            reason === 'occupied' ? other.emailNormalized : 'new@example.com',
+          expectedPasswordHash:
+            reason === 'stale-password' ? 'stale-hash' : user.passwordHash,
+          expectedAuthVersion: user.authVersion,
+        }),
+      ).rejects.toThrow();
       expect(await repository.findById(user.id)).toEqual(user);
-      expect(await prisma.authSession.findUniqueOrThrow({ where: { id: session.id } })).toEqual(before);
+      expect(
+        await prisma.authSession.findUniqueOrThrow({
+          where: { id: session.id },
+        }),
+      ).toEqual(before);
     },
   );
 
   it('changes credentials and revokes every session in the same transaction', async () => {
+    const action = await prisma.accountAction.create({
+      data: {
+        id: randomUUID(),
+        userId: user.id,
+        purpose: 'VERIFY_EMAIL',
+        tokenHash: randomUUID(),
+        emailNormalized: user.emailNormalized,
+        authVersion: user.authVersion,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const message = await prisma.identityMail.create({
+      data: {
+        id: randomUUID(),
+        actionId: action.id,
+        to: user.emailNormalized,
+        subject: 'Verification',
+        text: 'Old verification token',
+        expiresAt: action.expiresAt,
+      },
+    });
     await repository.changePassword(user.id, {
       expectedPasswordHash: user.passwordHash,
       expectedAuthVersion: user.authVersion,
@@ -146,6 +487,16 @@ describe('PrismaUserRepository account security transactions', () => {
         where: { userId: user.id, revokedAt: null },
       }),
     ).toBe(0);
+    expect(
+      await prisma.accountAction.findUniqueOrThrow({
+        where: { id: action.id },
+      }),
+    ).toMatchObject({ consumedAt: expect.any(Date) });
+    expect(
+      await prisma.identityMail.findUniqueOrThrow({
+        where: { id: message.id },
+      }),
+    ).toMatchObject({ text: '', lastError: 'ACCOUNT_ACTION_UNAVAILABLE' });
   });
 
   it.each(['password', 'version', 'locked', 'deleted'])(
@@ -239,7 +590,7 @@ describe('PrismaUserRepository account security transactions', () => {
   });
 
   it.each([
-    { role: 'USER' as const },
+    { role: 'CUSTOMER' as const },
     { status: 'LOCKED' as const },
     { deleted: true as const },
   ])(
@@ -263,7 +614,11 @@ describe('PrismaUserRepository account security transactions', () => {
     },
   );
 
-  it.each([{ role: 'USER' }, { status: 'LOCKED' }, { deletedAt: new Date() }])(
+  it.each([
+    { role: 'CUSTOMER' },
+    { status: 'LOCKED' },
+    { deletedAt: new Date() },
+  ])(
     'rechecks administrator privileges in the mutation transaction: %j',
     async (change) => {
       const actor = await createUser('ADMIN');
@@ -272,7 +627,7 @@ describe('PrismaUserRepository account security transactions', () => {
         repository.adminUpdate(actor.id, user.id, { role: 'ADMIN' }),
       ).rejects.toBeInstanceOf(AdminRequiredError);
       expect(await repository.findById(user.id)).toMatchObject({
-        role: 'USER',
+        role: 'CUSTOMER',
         authVersion: 0,
       });
     },
@@ -283,9 +638,9 @@ describe('PrismaUserRepository account security transactions', () => {
     const target = await createUser('ADMIN');
     await createSession(target.id);
     const result = await repository.adminUpdate(actor.id, target.id, {
-      role: 'USER',
+      role: 'CUSTOMER',
     });
-    expect(result).toMatchObject({ role: 'USER', authVersion: 1 });
+    expect(result.user).toMatchObject({ role: 'CUSTOMER', authVersion: 1 });
     expect(
       await prisma.authSession.count({
         where: { userId: target.id, revokedAt: null },
@@ -298,6 +653,19 @@ describe('PrismaUserRepository account security transactions', () => {
     });
   });
 
+  it('keeps unchanged administrator role and status updates idempotent without revoking sessions', async () => {
+    const actor = await createUser('ADMIN');
+    const before = await repository.findById(user.id);
+    await repository.adminUpdate(actor.id, user.id, { role: 'CUSTOMER' });
+    await repository.adminUpdate(actor.id, user.id, { status: 'ACTIVE' });
+    expect(await repository.findById(user.id)).toEqual(before);
+    expect(
+      await prisma.authSession.count({
+        where: { userId: user.id, revokedAt: null },
+      }),
+    ).toBe(2);
+  });
+
   it('filters and paginates user searches consistently', async () => {
     const admin = await createUser('ADMIN');
     await repository.adminUpdate(admin.id, user.id, { status: 'LOCKED' });
@@ -305,11 +673,11 @@ describe('PrismaUserRepository account security transactions', () => {
       page: 1,
       limit: 1,
       status: 'LOCKED',
-      role: 'USER',
+      role: 'CUSTOMER',
       q: user.emailNormalized.toUpperCase(),
     });
     expect(result.total).toBe(1);
-    expect(result.users.map((item) => item.id)).toEqual([user.id]);
+    expect(result.users.map((item) => item.user.id)).toEqual([user.id]);
     expect(
       await repository.list({ page: 2, limit: 1, status: 'LOCKED' }),
     ).toEqual({ users: [], total: 1 });
@@ -355,7 +723,7 @@ describe('PrismaUserRepository account security transactions', () => {
       'An active administrator already exists',
     );
     expect(await repository.findById(user.id)).toMatchObject({
-      role: 'USER',
+      role: 'CUSTOMER',
       authVersion: 0,
     });
   });
@@ -390,8 +758,8 @@ describe('PrismaUserRepository account security transactions', () => {
     const first = await createUser('ADMIN');
     const second = await createUser('ADMIN');
     const results = await Promise.allSettled([
-      repository.adminUpdate(first.id, first.id, { role: 'USER' }),
-      repository.adminUpdate(second.id, second.id, { role: 'USER' }),
+      repository.adminUpdate(first.id, first.id, { role: 'CUSTOMER' }),
+      repository.adminUpdate(second.id, second.id, { role: 'CUSTOMER' }),
     ]);
     expect(results.filter((item) => item.status === 'fulfilled')).toHaveLength(
       1,

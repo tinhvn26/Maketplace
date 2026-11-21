@@ -3,7 +3,10 @@ import type { ConfigType } from '@nestjs/config';
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import identityMailConfig from '../../../../config/identity-mail.config.js';
-import type { IdentityMailer, MailMessage } from '../../application/ports/identity-mailer.js';
+import type {
+  IdentityMailer,
+  MailMessage,
+} from '../../application/ports/identity-mailer.js';
 
 @Injectable()
 export class SmtpIdentityMailer implements IdentityMailer {

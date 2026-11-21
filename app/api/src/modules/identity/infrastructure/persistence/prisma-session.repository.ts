@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
+import { isUserRole, USER_ROLES } from '../../domain/types/user-role.types.js';
 import type {
   ActiveSession,
   AuthSession,
@@ -21,6 +22,7 @@ export class PrismaSessionRepository implements SessionRepository {
           AND "status" = 'ACTIVE'
           AND "deletedAt" IS NULL
           AND "authVersion" = ${session.authVersion}
+          AND "role" IN ('ADMIN', 'EMPLOYER', 'CUSTOMER')
       `;
       if (matched !== 1) return false;
       await tx.authSession.create({ data: session });
@@ -43,15 +45,12 @@ export class PrismaSessionRepository implements SessionRepository {
       },
       include: { user: { select: { authVersion: true, role: true } } },
     });
-    if (
-      !result ||
-      result.authVersion !== result.user.authVersion ||
-      (result.user.role !== 'USER' && result.user.role !== 'ADMIN')
-    ) {
+    if (!result || result.authVersion !== result.user.authVersion) {
       return null;
     }
     const { user, ...session } = result;
-    return { session, role: user.role as 'USER' | 'ADMIN' };
+    if (!isUserRole(user.role)) return null;
+    return { session, role: user.role };
   }
 
   async rotateRefreshToken(
@@ -79,6 +78,7 @@ export class PrismaSessionRepository implements SessionRepository {
             status: 'ACTIVE',
             deletedAt: null,
             authVersion: session.authVersion,
+            role: { in: [...USER_ROLES] },
           },
         },
         data: { refreshTokenHash: newHash, lastUsedAt: now },
@@ -117,7 +117,12 @@ export class PrismaSessionRepository implements SessionRepository {
 
   async listActive(userId: string, now: Date): Promise<AuthSession[]> {
     const user = await this.prisma.user.findFirst({
-      where: { id: userId, status: 'ACTIVE', deletedAt: null },
+      where: {
+        id: userId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        role: { in: [...USER_ROLES] },
+      },
       select: { authVersion: true },
     });
     if (!user) return [];

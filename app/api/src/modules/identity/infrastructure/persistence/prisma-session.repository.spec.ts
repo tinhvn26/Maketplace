@@ -106,7 +106,7 @@ describe('PrismaSessionRepository with SQLite', () => {
     expect(await prisma.authSession.count()).toBe(1);
     expect(
       (await repository.findActive('session-one', 'user-one', now))?.role,
-    ).toBe('USER');
+    ).toBe('CUSTOMER');
   });
 
   it('preserves the profile update timestamp when creating a login session', async () => {

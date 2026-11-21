@@ -243,7 +243,11 @@ describe('PrismaAccountActionRepository reset attempts with SQLite', () => {
     });
     expect(
       await prisma.user.findUniqueOrThrow({ where: { id: 'user-one' } }),
-    ).toMatchObject({ passwordHash: 'replacement-hash', authVersion: 4 });
+    ).toMatchObject({
+      passwordHash: 'replacement-hash',
+      authVersion: 4,
+      updatedAt: now,
+    });
     expect(
       await prisma.authSession.findUniqueOrThrow({
         where: { id: 'active-session' },
@@ -341,6 +345,9 @@ describe('PrismaAccountActionRepository reset attempts with SQLite', () => {
     );
     await repository.verifyEmail('verify-token-hash', now);
     expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: 'user-one' } }),
+    ).toMatchObject({ emailVerifiedAt: now, authVersion: 3, updatedAt: now });
+    expect(
       await prisma.identityMail.findFirstOrThrow({
         where: { actionId: 'verify-one' },
       }),
@@ -350,6 +357,66 @@ describe('PrismaAccountActionRepository reset attempts with SQLite', () => {
       lockedUntil: null,
       expiresAt: now,
     });
+  });
+
+  it('changes and verifies the confirmed email once while preserving profile data and revoking credentials', async () => {
+    await prisma.user.update({
+      where: { id: 'user-one' },
+      data: {
+        phoneNumber: '+84901234567',
+        emailVerifiedAt: new Date('2020-01-01T00:00:00.000Z'),
+      },
+    });
+    const profile = await prisma.userProfile.create({
+      data: { userId: 'user-one', avatarUrl: 'https://example.com/avatar.png' },
+    });
+    await prisma.authSession.create({
+      data: {
+        id: 'active-email-session',
+        userId: 'user-one',
+        authVersion: 3,
+        refreshTokenHash: 'refresh-hash',
+        expiresAt: new Date('2100-01-01T00:00:00.000Z'),
+      },
+    });
+    await repository.queue(
+      resetAction({
+        id: 'change-email',
+        purpose: 'CHANGE_EMAIL',
+        tokenHash: 'change-email-token',
+        emailNormalized: 'confirmed@example.com',
+      }),
+    );
+    await repository.queue(resetAction());
+    await repository.changeEmail('change-email-token', now);
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: 'user-one' } }),
+    ).toMatchObject({
+      emailNormalized: 'confirmed@example.com',
+      emailVerifiedAt: now,
+      phoneNumber: '+84901234567',
+      authVersion: 4,
+      updatedAt: now,
+    });
+    expect(
+      await prisma.userProfile.findUniqueOrThrow({
+        where: { userId: 'user-one' },
+      }),
+    ).toEqual(profile);
+    expect(
+      await prisma.authSession.findUniqueOrThrow({
+        where: { id: 'active-email-session' },
+      }),
+    ).toMatchObject({ revokedAt: now });
+    expect(
+      await prisma.accountAction.count({ where: { consumedAt: null } }),
+    ).toBe(0);
+    expect(
+      await prisma.identityMail.count({ where: { text: { not: '' } } }),
+    ).toBe(0);
+    await expect(
+      repository.changeEmail('change-email-token', now),
+    ).rejects.toBeInstanceOf(InvalidAccountActionError);
   });
 
   it('does not cancel another action purpose when issuing a replacement reset code', async () => {

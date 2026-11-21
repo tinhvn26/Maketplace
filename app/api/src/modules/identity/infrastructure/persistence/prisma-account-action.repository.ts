@@ -188,7 +188,10 @@ export class PrismaAccountActionRepository implements AccountActionRepository {
           emailNormalized: action.emailNormalized,
           emailVerifiedAt: null,
         },
-        data: { emailVerifiedAt: now },
+        data: {
+          emailVerifiedAt: now,
+          updatedAt: now,
+        },
       });
       if (updated.count !== 1) throw new InvalidAccountActionError();
     });
@@ -206,7 +209,11 @@ export class PrismaAccountActionRepository implements AccountActionRepository {
           ...this.userCondition(action),
           emailNormalized: action.emailNormalized,
         },
-        data: { passwordHash, authVersion: { increment: 1 } },
+        data: {
+          passwordHash,
+          authVersion: { increment: 1 },
+          updatedAt: now,
+        },
       });
       if (updated.count !== 1) throw new InvalidAccountActionError();
       await this.revokeCredentials(tx, action.userId, now);
@@ -232,6 +239,7 @@ export class PrismaAccountActionRepository implements AccountActionRepository {
             emailNormalized: action.emailNormalized,
             emailVerifiedAt: now,
             authVersion: { increment: 1 },
+            updatedAt: now,
           },
         });
         if (updated.count !== 1) throw new InvalidAccountActionError();

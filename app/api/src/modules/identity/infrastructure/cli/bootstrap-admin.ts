@@ -36,7 +36,7 @@ export async function bootstrapAdmin(
     if (user.role === 'ADMIN') {
       return { id: user.id, email: user.emailNormalized, alreadyAdmin: true };
     }
-    if (user.role !== 'USER')
+    if (user.role !== 'CUSTOMER' && user.role !== 'EMPLOYER')
       throw new Error('Account has an unsupported role');
     const existingAdmins = await tx.user.count({
       where: { role: 'ADMIN', status: 'ACTIVE', deletedAt: null },
@@ -46,21 +46,39 @@ export async function bootstrapAdmin(
         'An active administrator already exists; use the administrator API to manage roles',
       );
     }
+    const now = new Date();
     const result = await tx.user.updateMany({
       where: {
         id: user.id,
-        role: 'USER',
+        role: user.role,
         status: 'ACTIVE',
         deletedAt: null,
         authVersion: user.authVersion,
       },
-      data: { role: 'ADMIN', authVersion: { increment: 1 } },
+      data: {
+        role: 'ADMIN',
+        authVersion: { increment: 1 },
+        updatedAt: now,
+      },
     });
     if (result.count !== 1)
       throw new Error('Account changed during bootstrap; retry the command');
     await tx.authSession.updateMany({
       where: { userId: user.id, revokedAt: null },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: now },
+    });
+    await tx.identityMail.updateMany({
+      where: { sentAt: null, action: { is: { userId: user.id } } },
+      data: {
+        text: '',
+        expiresAt: now,
+        lockedUntil: null,
+        lastError: 'ACCOUNT_ACTION_UNAVAILABLE',
+      },
+    });
+    await tx.accountAction.updateMany({
+      where: { userId: user.id, consumedAt: null },
+      data: { consumedAt: now },
     });
     return { id: user.id, email: user.emailNormalized, alreadyAdmin: false };
   });
