@@ -12,18 +12,20 @@ import type { PasswordHasher } from '../ports/password-hasher.js';
 import type { UserProfileRepository } from '../ports/user.repository.js';
 import { isUserActive } from '../../domain/helpers/user.helpers.js';
 import {
-  isValidAvatarUrl,
   isValidCurrentPassword,
   isValidEmail,
   isValidFullName,
   isValidPassword,
+  isValidPhoneNumber,
 } from '../../domain/policies/user-input.policy.js';
+import { isValidAvatarUrl } from '../../domain/policies/profile-input.policy.js';
 import type { UpdateProfileInput } from './update-profile.input.js';
 import {
   toUserProfileResult,
   type UserProfileResult,
 } from './user-profile.result.js';
 
+/** Coordinates owner account changes; repositories recheck and commit security changes atomically. */
 export class UsersService {
   constructor(
     private readonly userRepository: UserProfileRepository,
@@ -31,20 +33,24 @@ export class UsersService {
   ) {}
 
   async getProfile(userId: string): Promise<UserProfileResult> {
-    const user = await this.userRepository.findById(userId);
+    const profile = await this.userRepository.findProfileById(userId);
 
-    if (!user || !isUserActive(user)) {
+    if (!profile || !isUserActive(profile.user)) {
       throw new UserUnavailableError();
     }
 
-    return toUserProfileResult(user);
+    return toUserProfileResult(profile);
   }
 
   async updateProfile(
     userId: string,
     input: UpdateProfileInput,
   ): Promise<UserProfileResult> {
-    if (input.fullName === undefined && input.avatarUrl === undefined) {
+    if (
+      input.fullName === undefined &&
+      input.phoneNumber === undefined &&
+      input.avatarUrl === undefined
+    ) {
       throw new EmptyProfileUpdateError();
     }
 
@@ -64,6 +70,14 @@ export class UsersService {
         );
       }
       changes.avatarUrl = input.avatarUrl;
+    }
+    if (input.phoneNumber !== undefined) {
+      if (!isValidPhoneNumber(input.phoneNumber)) {
+        throw new InvalidAccountInputError(
+          'Phone number must contain 7 to 15 digits with an optional leading +',
+        );
+      }
+      changes.phoneNumber = input.phoneNumber?.trim() ?? null;
     }
 
     const user = await this.userRepository.updateProfile(userId, changes);

@@ -1,11 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { User } from '../../domain/entities/user.interface.js';
+import { isUserRole } from '../../domain/types/user-role.types.js';
 import {
-  isValidAvatarUrl,
   isValidEmail,
   isValidFullName,
   isValidPassword,
+  isValidPhoneNumber,
 } from '../../domain/policies/user-input.policy.js';
+import { isValidAvatarUrl } from '../../domain/policies/profile-input.policy.js';
 import { isUserActive } from '../../domain/helpers/user.helpers.js';
 import {
   EmailAlreadyExistsError,
@@ -42,7 +44,7 @@ export class AuthService {
     const email = input.email.trim().toLowerCase();
     const user = await this.userRepository.findByEmail(email);
 
-    if (!user || !isUserActive(user)) {
+    if (!user || !isUserActive(user) || !isUserRole(user.role)) {
       throw new InvalidCredentialsError();
     }
 
@@ -97,6 +99,14 @@ export class AuthService {
         'Avatar URL must be an HTTP or HTTPS URL',
       );
     }
+    if (
+      input.phoneNumber !== undefined &&
+      !isValidPhoneNumber(input.phoneNumber)
+    ) {
+      throw new InvalidRegistrationInputError(
+        'Phone number must contain 7 to 15 digits with an optional leading +',
+      );
+    }
 
     const existingUser = await this.userRepository.findByEmail(emailNormalized);
 
@@ -111,9 +121,9 @@ export class AuthService {
       fullName,
       emailNormalized,
       passwordHash,
-      avatarUrl: input.avatarUrl ?? null,
+      phoneNumber: input.phoneNumber?.trim() ?? null,
       status: 'ACTIVE',
-      role: 'USER',
+      role: 'CUSTOMER',
       emailVerifiedAt: null,
       authVersion: 0,
       createdAt: now,
@@ -121,10 +131,14 @@ export class AuthService {
       deletedAt: null,
     };
 
-    const savedUser = await this.userRepository.create(user);
+    const savedUser = await this.userRepository.create(user, {
+      avatarUrl: input.avatarUrl ?? null,
+    });
 
     try {
-      await this.verification.requestVerification(savedUser.emailNormalized);
+      await this.verification.requestVerification(
+        savedUser.user.emailNormalized,
+      );
     } catch {
       // Registration has committed. Verification can be requested again.
       // Never include the recipient, token, or provider error in logs.
@@ -147,7 +161,7 @@ export class AuthService {
       new Date(),
     );
 
-    if (!active) {
+    if (!active || !isUserRole(active.role)) {
       throw new InvalidRefreshTokenError();
     }
 

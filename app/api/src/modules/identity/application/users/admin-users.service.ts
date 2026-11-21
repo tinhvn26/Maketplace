@@ -1,4 +1,7 @@
-import type { UserRole } from '../../domain/types/user-role.types.js';
+import {
+  isUserRole,
+  type UserRole,
+} from '../../domain/types/user-role.types.js';
 import type { UserStatus } from '../../domain/types/user-status.type.js';
 import {
   InvalidAccountInputError,
@@ -21,10 +24,12 @@ export interface UserListResult {
   pages: number;
 }
 
+/** Validates administrative intent; the repository checks live authority and the last-admin rule. */
 export class AdminUsersService {
   constructor(private readonly userRepository: AdminUserRepository) {}
 
   async list(query: UserListQuery): Promise<UserListResult> {
+    const q = typeof query.q === 'string' ? query.q.trim() : query.q;
     if (
       !Number.isSafeInteger(query.page) ||
       query.page < 1 ||
@@ -33,9 +38,9 @@ export class AdminUsersService {
       query.limit > 100 ||
       !Number.isSafeInteger((query.page - 1) * query.limit) ||
       (query.page - 1) * query.limit > 2147483647 ||
-      (query.q !== undefined &&
-        (typeof query.q !== 'string' || query.q.length > 100)) ||
-      (query.role !== undefined && !['USER', 'ADMIN'].includes(query.role)) ||
+      (q !== undefined &&
+        (typeof q !== 'string' || Array.from(q).length > 100)) ||
+      (query.role !== undefined && !isUserRole(query.role)) ||
       (query.status !== undefined &&
         !['ACTIVE', 'LOCKED'].includes(query.status))
     ) {
@@ -43,7 +48,7 @@ export class AdminUsersService {
     }
     const result = await this.userRepository.list({
       ...query,
-      q: query.q?.trim(),
+      q,
     });
     return {
       users: result.users.map(toUserProfileResult),
@@ -55,7 +60,7 @@ export class AdminUsersService {
   }
 
   async get(userId: string): Promise<UserProfileResult> {
-    const user = await this.userRepository.findById(userId);
+    const user = await this.userRepository.findProfileById(userId);
     if (!user) throw new UserNotFoundError();
     return toUserProfileResult(user);
   }
@@ -78,7 +83,7 @@ export class AdminUsersService {
     userId: string,
     role: UserRole,
   ): Promise<UserProfileResult> {
-    if (role !== 'USER' && role !== 'ADMIN') {
+    if (!isUserRole(role)) {
       throw new InvalidAccountInputError('Unsupported user role');
     }
     return toUserProfileResult(

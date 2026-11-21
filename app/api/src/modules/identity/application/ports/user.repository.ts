@@ -2,6 +2,10 @@ import type { User } from '../../domain/entities/user.interface.js';
 import type { UserRole } from '../../domain/types/user-role.types.js';
 import type { UserStatus } from '../../domain/types/user-status.type.js';
 import type { UpdateProfileInput } from '../users/update-profile.input.js';
+import type {
+  UserProfileDetails,
+  UserProfileRecord,
+} from '../users/user-profile.record.js';
 
 export const USER_REPOSITORY = Symbol('USER_REPOSITORY');
 
@@ -29,12 +33,20 @@ export interface UserReader {
 }
 
 export interface AuthUserRepository extends Pick<UserReader, 'findByEmail'> {
-  create(user: User): Promise<User>;
+  /** Account and profile must be created in one transaction. */
+  create(user: User, profile: UserProfileDetails): Promise<UserProfileRecord>;
 }
 
-export interface UserProfileRepository extends UserReader {
+export interface UserProfileReader {
+  findProfileById(id: string): Promise<UserProfileRecord | null>;
+}
+
+export interface UserProfileRepository extends UserReader, UserProfileReader {
   /** Updates only an active, nondeleted user; returns null otherwise. */
-  updateProfile(id: string, changes: UpdateProfileInput): Promise<User | null>;
+  updateProfile(
+    id: string,
+    changes: UpdateProfileInput,
+  ): Promise<UserProfileRecord | null>;
   /** Verify the snapshot and revoke every session atomically with the change. */
   changePassword(
     id: string,
@@ -48,14 +60,16 @@ export interface UserProfileRepository extends UserReader {
   deleteOwnAccount(id: string, snapshot: CredentialSnapshot): Promise<void>;
 }
 
-export interface AdminUserRepository extends Pick<UserReader, 'findById'> {
-  list(query: UserListQuery): Promise<{ users: User[]; total: number }>;
+export interface AdminUserRepository extends UserProfileReader {
+  list(
+    query: UserListQuery,
+  ): Promise<{ users: UserProfileRecord[]; total: number }>;
   /** Rechecks actor privileges and preserves at least one active administrator. */
   adminUpdate(
     actorId: string,
     id: string,
     change: AdminUserChange,
-  ): Promise<User>;
+  ): Promise<UserProfileRecord>;
 }
 
 /** Aggregate contract for persistence adapters; consumers depend on narrower ports. */

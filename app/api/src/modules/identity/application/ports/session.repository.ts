@@ -1,3 +1,5 @@
+import type { UserRole } from '../../domain/types/user-role.types.js';
+
 export const SESSION_REPOSITORY = Symbol('SESSION_REPOSITORY');
 
 export interface AuthSession {
@@ -13,7 +15,7 @@ export interface AuthSession {
 
 export interface ActiveSession {
   session: AuthSession;
-  role: 'USER' | 'ADMIN';
+  role: UserRole;
 }
 
 export interface SessionRepository {

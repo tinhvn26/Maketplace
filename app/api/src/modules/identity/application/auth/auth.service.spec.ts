@@ -16,27 +16,32 @@ import { AuthService } from './auth.service.js';
 
 function setup() {
   const now = new Date();
-  const user: User = {
+  const userData = {
     id: 'user',
     fullName: 'Account Owner',
     emailNormalized: 'owner@example.com',
     passwordHash: 'password-hash',
     status: 'ACTIVE',
-    role: 'USER',
-    avatarUrl: null,
+    role: 'CUSTOMER',
+    phoneNumber: null,
     authVersion: 4,
     emailVerifiedAt: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
-  };
+  } satisfies User;
+  const user = userData;
   const users = {
     findByEmail: vi
       .fn<AuthUserRepository['findByEmail']>()
       .mockResolvedValue(user),
     create: vi
       .fn<AuthUserRepository['create']>()
-      .mockImplementation(async (newUser) => newUser),
+      .mockImplementation(async (newUser, profile) => ({
+        user: newUser,
+        avatarUrl: profile.avatarUrl,
+        profileUpdatedAt: null,
+      })),
   } satisfies AuthUserRepository;
   const passwords = {
     hash: vi
@@ -73,7 +78,7 @@ function setup() {
       .mockResolvedValue(true),
     findActive: vi
       .fn<SessionRepository['findActive']>()
-      .mockResolvedValue({ session, role: 'USER' }),
+      .mockResolvedValue({ session, role: 'CUSTOMER' }),
     rotateRefreshToken: vi
       .fn<SessionRepository['rotateRefreshToken']>()
       .mockResolvedValue(true),
@@ -101,6 +106,7 @@ function setup() {
     verification,
     logger,
     user,
+    userData,
     users,
     passwords,
     tokens,
@@ -111,6 +117,36 @@ function setup() {
 }
 
 describe('AuthService session boundary', () => {
+  it.each(['CUSTOMER', 'EMPLOYER', 'ADMIN'] as const)(
+    'allows active %s accounts to log in without changing their role',
+    async (role) => {
+      const { user, users, service, result, sessions } = setup();
+      users.findByEmail.mockResolvedValue({ ...user, role });
+      await expect(
+        service.login({ email: user.emailNormalized, password: 'password' }),
+      ).resolves.toBe(result);
+      expect(sessions.createIfActive).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: user.id,
+          authVersion: user.authVersion,
+        }),
+      );
+      expect(users.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['USER', 'EMPLOYEE', 'UNKNOWN'])(
+    'rejects a legacy or unknown account role before verifying credentials: %s',
+    async (role) => {
+      const { user, users, service, passwords, sessions } = setup();
+      users.findByEmail.mockResolvedValue({ ...user, role } as unknown as User);
+      await expect(
+        service.login({ email: user.emailNormalized, password: 'password' }),
+      ).rejects.toBeInstanceOf(InvalidCredentialsError);
+      expect(passwords.verify).not.toHaveBeenCalled();
+      expect(sessions.createIfActive).not.toHaveBeenCalled();
+    },
+  );
   it('persists only a refresh hash with the verified credential version at login', async () => {
     const { service, sessions, users, result } = setup();
     await expect(
@@ -141,8 +177,8 @@ describe('AuthService session boundary', () => {
   });
 
   it('never creates sessions for deleted accounts or wrong passwords', async () => {
-    const { service, user, users, passwords, sessions } = setup();
-    users.findByEmail.mockResolvedValue({ ...user, deletedAt: new Date() });
+    const { service, user, userData, users, passwords, sessions } = setup();
+    users.findByEmail.mockResolvedValue({ ...userData, deletedAt: new Date() });
     await expect(
       service.login({ email: user.emailNormalized, password: 'password' }),
     ).rejects.toBeInstanceOf(InvalidCredentialsError);
@@ -211,6 +247,32 @@ describe('AuthService registration boundary', () => {
     password: 'a-valid-password',
   };
 
+  it.each(['ADMIN', 'EMPLOYER'])(
+    'ignores a forged %s role and creates an unverified customer',
+    async (role) => {
+      const { service, users } = setup();
+      users.findByEmail.mockResolvedValue(null);
+      const forged = {
+        ...input,
+        role,
+        emailVerifiedAt: new Date(),
+        status: 'LOCKED',
+      };
+      const result = await service.register(forged);
+      expect(users.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'CUSTOMER',
+          status: 'ACTIVE',
+          emailVerifiedAt: null,
+          authVersion: 0,
+        }),
+        { avatarUrl: null },
+      );
+      expect(result.role).toBe('CUSTOMER');
+      expect(result.isEmailVerified).toBe(false);
+    },
+  );
+
   it.each([
     { fullName: ' ' },
     { fullName: 'x'.repeat(101) },
@@ -221,6 +283,9 @@ describe('AuthService registration boundary', () => {
     { avatarUrl: 'javascript:alert(1)' },
     { avatarUrl: 'not-a-url' },
     { avatarUrl: `https://example.com/${'x'.repeat(2048)}` },
+    { phoneNumber: 'invalid-number' },
+    { phoneNumber: '123456' },
+    { phoneNumber: '+1234567890123456' },
   ])(
     'rejects invalid registration without an HTTP validation pipe: %j',
     async (changes) => {
@@ -243,10 +308,14 @@ describe('AuthService registration boundary', () => {
     const { service, users, verification } = setup();
     users.findByEmail.mockResolvedValue(null);
     let committed = false;
-    users.create.mockImplementation(async (newUser) => {
+    users.create.mockImplementation(async (newUser, details) => {
       await Promise.resolve();
       committed = true;
-      return newUser;
+      return {
+        user: newUser,
+        avatarUrl: details.avatarUrl,
+        profileUpdatedAt: null,
+      };
     });
     verification.requestVerification.mockImplementation(async () => {
       expect(committed).toBe(true);
@@ -255,7 +324,7 @@ describe('AuthService registration boundary', () => {
     expect(profile).toMatchObject({
       fullName: 'New Account',
       email: 'new@example.com',
-      role: 'USER',
+      role: 'CUSTOMER',
     });
     expect(profile).not.toHaveProperty('passwordHash');
     expect(users.create).toHaveBeenCalledWith(
@@ -263,10 +332,38 @@ describe('AuthService registration boundary', () => {
         emailNormalized: 'new@example.com',
         passwordHash: 'new-password-hash',
       }),
+      { avatarUrl: null },
     );
     expect(verification.requestVerification).toHaveBeenCalledExactlyOnceWith(
       'new@example.com',
     );
+  });
+
+  it('persists account data and avatar separately while accepting an optional phone number', async () => {
+    const { service, users } = setup();
+    users.findByEmail.mockResolvedValue(null);
+    const result = await service.register({
+      ...input,
+      phoneNumber: ' +84901234567 ',
+      avatarUrl: 'https://example.com/avatar.png',
+    });
+    const [account, profile] = users.create.mock.calls[0];
+    expect(account).toMatchObject({
+      role: 'CUSTOMER',
+      status: 'ACTIVE',
+      emailVerifiedAt: null,
+      authVersion: 0,
+    });
+    expect(account.phoneNumber).toBe('+84901234567');
+    expect(account).not.toHaveProperty('avatarUrl');
+    expect(profile).toEqual({ avatarUrl: 'https://example.com/avatar.png' });
+    expect(result).toMatchObject({
+      phoneNumber: '+84901234567',
+      avatarUrl: 'https://example.com/avatar.png',
+      isEmailVerified: false,
+    });
+    expect(result).not.toHaveProperty('passwordHash');
+    expect(result).not.toHaveProperty('authVersion');
   });
 
   it('keeps a committed registration successful when verification queueing fails', async () => {
