@@ -25,7 +25,8 @@ export function removesAdministratorAccess(
   return (
     change.deleted === true ||
     change.status === 'LOCKED' ||
-    change.role === 'USER'
+    change.role === 'CUSTOMER' ||
+    change.role === 'EMPLOYER'
   );
 }
 

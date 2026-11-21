@@ -5,6 +5,7 @@ import {
   removesAdministratorAccess,
   type UserSecurityState,
 } from './user-security.policy.js';
+import { isUserRole, USER_ROLES } from '../types/user-role.types.js';
 
 const administrator: UserSecurityState = {
   role: 'ADMIN',
@@ -15,7 +16,8 @@ const administrator: UserSecurityState = {
 describe('administrator security policy', () => {
   it.each([
     null,
-    { ...administrator, role: 'USER' },
+    { ...administrator, role: 'CUSTOMER' },
+    { ...administrator, role: 'EMPLOYER' },
     { ...administrator, status: 'LOCKED' },
     { ...administrator, deletedAt: new Date() },
   ])('rejects unavailable or nonadministrator actors: %j', (actor) => {
@@ -30,7 +32,8 @@ describe('administrator security policy', () => {
   });
 
   it.each([
-    { ...administrator, role: 'USER' },
+    { ...administrator, role: 'CUSTOMER' },
+    { ...administrator, role: 'EMPLOYER' },
     { ...administrator, status: 'LOCKED' },
     { ...administrator, deletedAt: new Date() },
   ])(
@@ -40,12 +43,32 @@ describe('administrator security policy', () => {
     },
   );
 
-  it.each([{ deleted: true }, { status: 'LOCKED' }, { role: 'USER' }])(
-    'recognizes changes that remove administrator access: %j',
-    (change) => {
-      expect(removesAdministratorAccess(change)).toBe(true);
-    },
-  );
+  it.each([
+    { deleted: true },
+    { status: 'LOCKED' },
+    { role: 'CUSTOMER' },
+    { role: 'EMPLOYER' },
+  ])('recognizes changes that remove administrator access: %j', (change) => {
+    expect(removesAdministratorAccess(change)).toBe(true);
+  });
+
+  it('accepts exactly the three current roles and rejects the legacy role', () => {
+    expect(USER_ROLES).toEqual(['ADMIN', 'EMPLOYER', 'CUSTOMER']);
+    for (const role of USER_ROLES) expect(isUserRole(role)).toBe(true);
+    for (const role of [
+      'USER',
+      'Employee',
+      'EMPLOYEE',
+      'employer',
+      '',
+      null,
+      undefined,
+      {},
+      1,
+    ]) {
+      expect(isUserRole(role)).toBe(false);
+    }
+  });
 
   it.each([{ deleted: false }, { status: 'ACTIVE' }, { role: 'ADMIN' }])(
     'does not treat preserving or granting access as removal: %j',

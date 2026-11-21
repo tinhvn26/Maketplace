@@ -1,12 +1,12 @@
-import type { UserStatus } from '../types/user-status.type.js';
 import type { UserRole } from '../types/user-role.types.js';
+import type { UserStatus } from '../types/user-status.type.js';
 
 export interface User {
   id: string;
   fullName: string;
   emailNormalized: string;
   passwordHash: string;
-  avatarUrl: string | null;
+  phoneNumber: string | null;
   status: UserStatus;
   role: UserRole;
   emailVerifiedAt: Date | null;

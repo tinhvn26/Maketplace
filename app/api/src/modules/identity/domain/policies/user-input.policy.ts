@@ -5,7 +5,7 @@ export const USER_INPUT_LIMITS = {
   email: 254,
   passwordMin: 8,
   passwordMax: 128,
-  avatarUrl: 2048,
+  phoneNumber: 16,
 } as const;
 
 export function isValidFullName(value: unknown): value is string {
@@ -43,14 +43,11 @@ export function isValidCurrentPassword(value: unknown): value is string {
   );
 }
 
-export function isValidAvatarUrl(value: unknown): value is string | null {
+export function isValidPhoneNumber(value: unknown): value is string | null {
   if (value === null) return true;
   return (
     typeof value === 'string' &&
-    validator.isLength(value, { max: USER_INPUT_LIMITS.avatarUrl }) &&
-    validator.isURL(value, {
-      protocols: ['http', 'https'],
-      require_protocol: true,
-    })
+    value.trim().length <= USER_INPUT_LIMITS.phoneNumber &&
+    /^\+?[0-9]{7,15}$/.test(value.trim())
   );
 }
