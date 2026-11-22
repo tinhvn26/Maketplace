@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { User } from '../../domain/entities/user.interface.js';
+import type { User } from '../../domain/entities/user.js';
 import {
   EmailAlreadyExistsError,
   InvalidFullNameError,
-} from '../errors/auth.errors.js';
+} from '../../domain/errors/auth.errors.js';
 import {
   IncorrectPasswordError,
   EmptyProfileUpdateError,
   InvalidAccountInputError,
   UserUnavailableError,
-} from '../errors/users.errors.js';
+} from '../../domain/errors/users.errors.js';
 import type { PasswordHasher } from '../ports/password-hasher.js';
 import type { UserProfileRepository } from '../ports/user.repository.js';
 import { UsersService } from './users.service.js';

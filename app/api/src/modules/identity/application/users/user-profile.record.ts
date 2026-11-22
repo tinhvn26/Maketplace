@@ -1,4 +1,4 @@
-import type { User } from '../../domain/entities/user.interface.js';
+import type { User } from '../../domain/entities/user.js';
 
 /** Profile data is composed with the account only at the read boundary. */
 export interface UserProfileRecord {

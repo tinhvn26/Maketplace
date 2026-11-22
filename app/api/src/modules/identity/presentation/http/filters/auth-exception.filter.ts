@@ -7,7 +7,7 @@ import {
   InvalidFullNameError,
   InvalidRefreshTokenError,
   InvalidRegistrationInputError,
-} from '../../../application/errors/auth.errors.js';
+} from '../../../domain/errors/auth.errors.js';
 
 type AuthApplicationError =
   | InvalidCredentialsError

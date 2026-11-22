@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { User } from '../../domain/entities/user.interface.js';
-import { isUserRole } from '../../domain/types/user-role.types.js';
+import type { User } from '../../domain/entities/user.js';
+import { isUserRole } from '../../domain/types/user-role.type.js';
 import {
   isValidEmail,
   isValidFullName,
@@ -8,14 +8,14 @@ import {
   isValidPhoneNumber,
 } from '../../domain/policies/user-input.policy.js';
 import { isValidAvatarUrl } from '../../domain/policies/profile-input.policy.js';
-import { isUserActive } from '../../domain/helpers/user.helpers.js';
+import { isUserActive } from '../../domain/entities/user.js';
 import {
   EmailAlreadyExistsError,
   InvalidCredentialsError,
   InvalidFullNameError,
   InvalidRefreshTokenError,
   InvalidRegistrationInputError,
-} from '../errors/auth.errors.js';
+} from '../../domain/errors/auth.errors.js';
 import type { PasswordHasher } from '../ports/password-hasher.js';
 import type { TokenIssuer } from '../ports/token-issuer.js';
 import type { SessionRepository } from '../ports/session.repository.js';

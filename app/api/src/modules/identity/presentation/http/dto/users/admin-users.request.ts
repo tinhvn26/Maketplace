@@ -11,7 +11,7 @@ import {
 import {
   USER_ROLES,
   type UserRole,
-} from '../../../../domain/types/user-role.types.js';
+} from '../../../../domain/types/user-role.type.js';
 import type { UserStatus } from '../../../../domain/types/user-status.type.js';
 
 export class ListUsersRequest {

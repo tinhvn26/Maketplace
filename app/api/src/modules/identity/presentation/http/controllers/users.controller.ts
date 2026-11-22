@@ -22,7 +22,7 @@ import {
 } from '../dto/users/user-profile.response.js';
 import { UsersExceptionFilter } from '../filters/users-exception.filter.js';
 import { AccessTokenGuard } from '../guards/access-token.guard.js';
-import { ChangeEmailRequest } from '../dto/recovery/account-action.request.js';
+import { ChangeEmailRequest } from '../dto/account-actions/account-action.request.js';
 import { IdentityRateLimit } from '../decorators/identity-rate-limit.decorator.js';
 
 @Controller('user')

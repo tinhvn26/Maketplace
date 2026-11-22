@@ -1,12 +1,12 @@
 import {
   isUserRole,
   type UserRole,
-} from '../../domain/types/user-role.types.js';
+} from '../../domain/types/user-role.type.js';
 import type { UserStatus } from '../../domain/types/user-status.type.js';
 import {
   InvalidAccountInputError,
   UserNotFoundError,
-} from '../errors/users.errors.js';
+} from '../../domain/errors/users.errors.js';
 import type {
   UserListQuery,
   AdminUserRepository,

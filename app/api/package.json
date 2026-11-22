@@ -26,7 +26,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "identity:bootstrap-admin": "npm run build && node dist/modules/identity/infrastructure/cli/bootstrap-admin.js"
+    "identity:bootstrap-admin": "npm run build && node dist/modules/identity/presentation/cli/bootstrap-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

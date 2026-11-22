@@ -1,4 +1,4 @@
-import type { UserRole } from '../types/user-role.types.js';
+import type { UserRole } from '../types/user-role.type.js';
 import type { UserStatus } from '../types/user-status.type.js';
 
 export interface User {
@@ -14,4 +14,12 @@ export interface User {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+}
+
+export function isUserDeleted(user: User): boolean {
+  return user.deletedAt !== null;
+}
+
+export function isUserActive(user: User): boolean {
+  return user.status === 'ACTIVE' && user.deletedAt === null;
 }

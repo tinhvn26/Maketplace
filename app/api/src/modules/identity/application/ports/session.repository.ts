@@ -1,4 +1,4 @@
-import type { UserRole } from '../../domain/types/user-role.types.js';
+import type { UserRole } from '../../domain/types/user-role.type.js';
 
 export const SESSION_REPOSITORY = Symbol('SESSION_REPOSITORY');
 

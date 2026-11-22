@@ -14,14 +14,14 @@ import {
   vi,
 } from 'vitest';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import type { User } from '../../domain/entities/user.interface.js';
+import type { User } from '../../domain/entities/user.js';
 import {
   AccountChangedError,
   AdminRequiredError,
   LastAdminError,
-} from '../../application/errors/users.errors.js';
+} from '../../domain/errors/users.errors.js';
 import { PrismaUserRepository } from './prisma-user.repository.js';
-import { bootstrapAdmin } from '../cli/bootstrap-admin.js';
+import { bootstrapAdmin } from '../../presentation/cli/bootstrap-admin.js';
 
 describe('PrismaUserRepository account security transactions', () => {
   let prisma: PrismaService;

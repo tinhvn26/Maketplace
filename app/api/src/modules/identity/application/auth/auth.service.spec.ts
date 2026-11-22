@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import type { User } from '../../domain/entities/user.interface.js';
+import type { User } from '../../domain/entities/user.js';
 import {
   InvalidCredentialsError,
   InvalidRefreshTokenError,
   InvalidFullNameError,
   InvalidRegistrationInputError,
-} from '../errors/auth.errors.js';
+} from '../../domain/errors/auth.errors.js';
 import type { PasswordHasher } from '../ports/password-hasher.js';
 import type { SessionRepository } from '../ports/session.repository.js';
 import type { TokenIssuer } from '../ports/token-issuer.js';

@@ -1,16 +1,16 @@
 import {
   EmailAlreadyExistsError,
   InvalidFullNameError,
-} from '../errors/auth.errors.js';
+} from '../../domain/errors/auth.errors.js';
 import {
   EmptyProfileUpdateError,
   IncorrectPasswordError,
   InvalidAccountInputError,
   UserUnavailableError,
-} from '../errors/users.errors.js';
+} from '../../domain/errors/users.errors.js';
 import type { PasswordHasher } from '../ports/password-hasher.js';
 import type { UserProfileRepository } from '../ports/user.repository.js';
-import { isUserActive } from '../../domain/helpers/user.helpers.js';
+import { isUserActive } from '../../domain/entities/user.js';
 import {
   isValidCurrentPassword,
   isValidEmail,

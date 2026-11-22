@@ -13,7 +13,7 @@ import {
   vi,
 } from 'vitest';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import { InvalidAccountActionError } from '../../application/errors/account-actions.errors.js';
+import { InvalidAccountActionError } from '../../domain/errors/account-actions.errors.js';
 import type { QueueAccountActionInput } from '../../application/ports/account-action.repository.js';
 import { PrismaAccountActionRepository } from './prisma-account-action.repository.js';
 

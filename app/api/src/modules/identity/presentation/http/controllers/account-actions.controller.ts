@@ -1,10 +1,10 @@
 import { Body, Controller, HttpCode, Post, UseFilters } from '@nestjs/common';
-import { AccountActionsService } from '../../../application/recovery/account-actions.service.js';
+import { AccountActionsService } from '../../../application/account-actions/account-actions.service.js';
 import {
   AccountActionTokenRequest,
   AccountEmailRequest,
   ResetPasswordRequest,
-} from '../dto/recovery/account-action.request.js';
+} from '../dto/account-actions/account-action.request.js';
 import { AccountActionsExceptionFilter } from '../filters/account-actions-exception.filter.js';
 import { IdentityRateLimit } from '../decorators/identity-rate-limit.decorator.js';
 

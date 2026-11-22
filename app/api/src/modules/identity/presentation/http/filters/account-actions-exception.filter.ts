@@ -1,14 +1,14 @@
 import { Catch, HttpStatus } from '@nestjs/common';
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { EmailAlreadyExistsError } from '../../../application/errors/auth.errors.js';
-import { UserUnavailableError } from '../../../application/errors/users.errors.js';
+import { EmailAlreadyExistsError } from '../../../domain/errors/auth.errors.js';
+import { UserUnavailableError } from '../../../domain/errors/users.errors.js';
 import {
   IncorrectAccountPasswordError,
   InvalidAccountActionError,
   InvalidAccountPasswordError,
   InvalidEmailChangeError,
-} from '../../../application/errors/account-actions.errors.js';
+} from '../../../domain/errors/account-actions.errors.js';
 
 type AccountActionsError =
   | InvalidAccountActionError

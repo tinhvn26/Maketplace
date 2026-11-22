@@ -6,15 +6,15 @@ import {
   randomUUID,
   timingSafeEqual,
 } from 'node:crypto';
-import type { User } from '../../domain/entities/user.interface.js';
-import { isUserActive } from '../../domain/helpers/user.helpers.js';
+import type { User } from '../../domain/entities/user.js';
+import { isUserActive } from '../../domain/entities/user.js';
 import { accountActionLifetimeMinutes } from '../../domain/policies/account-action.policy.js';
 import {
   isValidEmail,
   isValidPassword,
 } from '../../domain/policies/user-input.policy.js';
-import { EmailAlreadyExistsError } from '../errors/auth.errors.js';
-import { UserUnavailableError } from '../errors/users.errors.js';
+import { EmailAlreadyExistsError } from '../../domain/errors/auth.errors.js';
+import { UserUnavailableError } from '../../domain/errors/users.errors.js';
 import type {
   AccountActionPurpose,
   AccountActionRepository,
@@ -27,7 +27,7 @@ import {
   InvalidAccountActionError,
   InvalidAccountPasswordError,
   InvalidEmailChangeError,
-} from '../errors/account-actions.errors.js';
+} from '../../domain/errors/account-actions.errors.js';
 
 export interface AccountActionsOptions {
   resetOtpSecret: string;

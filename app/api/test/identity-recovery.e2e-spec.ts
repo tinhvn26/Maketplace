@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { InvalidAccountActionError } from '../src/modules/identity/application/errors/account-actions.errors.js';
-import { AccountActionsService } from '../src/modules/identity/application/recovery/account-actions.service.js';
+import { InvalidAccountActionError } from '../src/modules/identity/domain/errors/account-actions.errors.js';
+import { AccountActionsService } from '../src/modules/identity/application/account-actions/account-actions.service.js';
 import {
   createIdentityTestApp,
   TEST_PASSWORD,
@@ -386,6 +386,7 @@ describe('Identity recovery HTTP API', () => {
     expect(response.body.emailVerifiedAt).toBe(
       saved.emailVerifiedAt!.toISOString(),
     );
+    expect(response.body.isEmailVerified).toBe(true);
     const beforeCount = await context.prisma.identityMail.count();
     await context
       .http()
@@ -485,6 +486,7 @@ describe('Identity recovery HTTP API', () => {
       id: user.id,
       email: 'next@example.com',
       emailVerifiedAt: null,
+      isEmailVerified: false,
     });
     expect(
       await context.prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
@@ -567,6 +569,7 @@ describe('Identity recovery HTTP API', () => {
     expect(updatedProfile.body.emailVerifiedAt).toBe(
       changed.emailVerifiedAt!.toISOString(),
     );
+    expect(updatedProfile.body.isEmailVerified).toBe(true);
     await context
       .http()
       .post('/auth/email-change/confirm')

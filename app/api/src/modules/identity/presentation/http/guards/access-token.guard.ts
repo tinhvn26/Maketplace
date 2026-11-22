@@ -8,7 +8,7 @@ import type { SessionRepository } from '../../../application/ports/session.repos
 import {
   isUserRole,
   type UserRole,
-} from '../../../domain/types/user-role.types.js';
+} from '../../../domain/types/user-role.type.js';
 
 export interface AuthenticatedRequest extends Request {
   userId?: string;

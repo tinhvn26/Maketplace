@@ -1,7 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import type { User } from '../../domain/entities/user.interface.js';
-import { EmailAlreadyExistsError } from '../errors/auth.errors.js';
+import type { User } from '../../domain/entities/user.js';
+import { EmailAlreadyExistsError } from '../../domain/errors/auth.errors.js';
 import type { UserReader } from '../ports/user.repository.js';
 import type { AccountActionMessageBuilder } from '../ports/account-action-message-builder.js';
 import {
@@ -9,7 +9,7 @@ import {
   InvalidAccountActionError,
   InvalidAccountPasswordError,
   InvalidEmailChangeError,
-} from '../errors/account-actions.errors.js';
+} from '../../domain/errors/account-actions.errors.js';
 import { AccountActionsService } from './account-actions.service.js';
 
 const resetOtpSecret = 'test-reset-otp-secret-at-least-32-bytes';

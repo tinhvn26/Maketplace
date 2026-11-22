@@ -4,7 +4,7 @@ import { HttpAdapterHost } from '@nestjs/core';
 import {
   EmailAlreadyExistsError,
   InvalidFullNameError,
-} from '../../../application/errors/auth.errors.js';
+} from '../../../domain/errors/auth.errors.js';
 import {
   EmptyProfileUpdateError,
   AccountChangedError,
@@ -14,7 +14,7 @@ import {
   LastAdminError,
   UserNotFoundError,
   UserUnavailableError,
-} from '../../../application/errors/users.errors.js';
+} from '../../../domain/errors/users.errors.js';
 
 type UsersApplicationError =
   | EmailAlreadyExistsError

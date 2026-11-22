@@ -1,5 +1,5 @@
 import type { UserStatus } from '../../../../domain/types/user-status.type.js';
-import type { UserRole } from '../../../../domain/types/user-role.types.js';
+import type { UserRole } from '../../../../domain/types/user-role.type.js';
 import type { UserProfileResult } from '../../../../application/users/user-profile.result.js';
 
 export interface UserProfileResponse {

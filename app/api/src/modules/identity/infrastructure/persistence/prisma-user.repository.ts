@@ -4,20 +4,20 @@ import type {
   User as PrismaUser,
 } from '../../../../platform/database/generated/client.js';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import type { User } from '../../domain/entities/user.interface.js';
-import { isUserRole } from '../../domain/types/user-role.types.js';
+import type { User } from '../../domain/entities/user.js';
+import { isUserRole } from '../../domain/types/user-role.type.js';
 import {
   canRemoveAdministratorAccess,
   isActiveAdministrator,
   removesAdministratorAccess,
 } from '../../domain/policies/user-security.policy.js';
-import { EmailAlreadyExistsError } from '../../application/errors/auth.errors.js';
+import { EmailAlreadyExistsError } from '../../domain/errors/auth.errors.js';
 import {
   AccountChangedError,
   AdminRequiredError,
   LastAdminError,
   UserNotFoundError,
-} from '../../application/errors/users.errors.js';
+} from '../../domain/errors/users.errors.js';
 import type {
   AdminUserChange,
   CredentialSnapshot,

@@ -5,7 +5,7 @@ import {
   removesAdministratorAccess,
   type UserSecurityState,
 } from './user-security.policy.js';
-import { isUserRole, USER_ROLES } from '../types/user-role.types.js';
+import { isUserRole, USER_ROLES } from '../types/user-role.type.js';
 
 const administrator: UserSecurityState = {
   role: 'ADMIN',

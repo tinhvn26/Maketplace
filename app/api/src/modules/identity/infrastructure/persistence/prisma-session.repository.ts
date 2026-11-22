@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import { isUserRole, USER_ROLES } from '../../domain/types/user-role.types.js';
+import { isUserRole, USER_ROLES } from '../../domain/types/user-role.type.js';
 import type {
   ActiveSession,
   AuthSession,

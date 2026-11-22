@@ -33,7 +33,7 @@ import { RATE_LIMIT_STORE } from './application/ports/rate-limit-store.js';
 import { AuthService } from './application/auth/auth.service.js';
 import { UsersService } from './application/users/users.service.js';
 import { AdminUsersService } from './application/users/admin-users.service.js';
-import { AccountActionsService } from './application/recovery/account-actions.service.js';
+import { AccountActionsService } from './application/account-actions/account-actions.service.js';
 
 import { PrismaUserRepository } from './infrastructure/persistence/prisma-user.repository.js';
 import { PrismaSessionRepository } from './infrastructure/persistence/prisma-session.repository.js';

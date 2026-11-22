@@ -6,13 +6,13 @@ import type {
   User,
 } from '../../../../platform/database/generated/client.js';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import { EmailAlreadyExistsError } from '../../application/errors/auth.errors.js';
+import { EmailAlreadyExistsError } from '../../domain/errors/auth.errors.js';
 import type {
   AccountActionPurpose,
   AccountActionRepository,
   QueueAccountActionInput,
 } from '../../application/ports/account-action.repository.js';
-import { InvalidAccountActionError } from '../../application/errors/account-actions.errors.js';
+import { InvalidAccountActionError } from '../../domain/errors/account-actions.errors.js';
 import {
   accountActionCooldownStart,
   canQueueAccountAction,

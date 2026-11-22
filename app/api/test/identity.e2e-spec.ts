@@ -35,18 +35,22 @@ describe('Identity authentication and account HTTP flows', () => {
     const user = await test.register('  New.User@Example.com  ');
     expect(user).toMatchObject({
       email: 'new.user@example.com',
-      role: 'USER',
+      phoneNumber: null,
+      role: 'CUSTOMER',
       emailVerifiedAt: null,
+      isEmailVerified: false,
     });
     expect(Object.keys(user).sort()).toEqual(
       [
         'id',
         'fullName',
         'email',
+        'phoneNumber',
         'avatarUrl',
         'status',
         'role',
         'emailVerifiedAt',
+        'isEmailVerified',
         'createdAt',
         'updatedAt',
       ].sort(),
@@ -91,6 +95,23 @@ describe('Identity authentication and account HTTP flows', () => {
       const tokens = await test.login(email);
       const profile = await me(tokens.accessToken).expect(200);
       expect(profile.body.email).toBe(email);
+    },
+  );
+
+  it.each(['EMPLOYER', 'CUSTOMER'])(
+    'rejects role assignment through public registration: %s',
+    async (role) => {
+      await test
+        .http()
+        .post('/auth/register')
+        .send({
+          fullName: 'Public Account',
+          email: 'public-role@example.com',
+          password: TEST_PASSWORD,
+          role,
+        })
+        .expect(400);
+      expect(await test.prisma.user.count()).toBe(0);
     },
   );
 
@@ -356,10 +377,19 @@ describe('Identity authentication and account HTTP flows', () => {
   it('provides bounded searchable admin pagination and safe user details', async () => {
     const admin = await createAdmin();
     const target = await test.register('findme@example.com', 'Find Me');
+    const emailVerifiedAt = new Date('2026-11-01T00:00:00.000Z');
+    await test.prisma.user.update({
+      where: { id: target.id },
+      data: { phoneNumber: '+84901234567', emailVerifiedAt },
+    });
+    await test.prisma.userProfile.update({
+      where: { userId: target.id },
+      data: { avatarUrl: 'https://example.com/admin-profile.png' },
+    });
     await test.register('other@example.com', 'Other');
     const result = await test
       .http()
-      .get('/admin/users?q=findme&role=USER&page=1&limit=1')
+      .get('/admin/users?q=findme&role=CUSTOMER&page=1&limit=1')
       .auth(admin.accessToken, { type: 'bearer' })
       .expect(200);
     expect(result.body).toMatchObject({
@@ -367,14 +397,33 @@ describe('Identity authentication and account HTTP flows', () => {
       page: 1,
       limit: 1,
       pages: 1,
-      users: [{ id: target.id }],
+      users: [
+        {
+          id: target.id,
+          phoneNumber: '+84901234567',
+          avatarUrl: 'https://example.com/admin-profile.png',
+          isEmailVerified: true,
+          emailVerifiedAt: emailVerifiedAt.toISOString(),
+        },
+      ],
     });
-    expect(JSON.stringify(result.body)).not.toContain('passwordHash');
-    await test
+    const detail = await test
       .http()
       .get(`/admin/users/${target.id}`)
       .auth(admin.accessToken, { type: 'bearer' })
       .expect(200);
+    expect(detail.body).toEqual(result.body.users[0]);
+    expect(Object.keys(detail.body).sort()).toEqual(Object.keys(target).sort());
+    for (const field of [
+      'passwordHash',
+      'emailNormalized',
+      'authVersion',
+      'deletedAt',
+      'refreshTokenHash',
+    ]) {
+      expect(JSON.stringify(result.body)).not.toContain(field);
+      expect(detail.body).not.toHaveProperty(field);
+    }
     await test
       .http()
       .get(`/admin/users/${randomUUID()}`)
@@ -441,7 +490,7 @@ describe('Identity authentication and account HTTP flows', () => {
       .get('/admin/users')
       .auth(elevated.accessToken, { type: 'bearer' })
       .expect(200);
-    await role('USER').expect(200);
+    await role('CUSTOMER').expect(200);
     await test
       .http()
       .get('/admin/users')
@@ -463,12 +512,14 @@ describe('Identity authentication and account HTTP flows', () => {
       .auth(admin.accessToken, { type: 'bearer' })
       .send({ status: 'LOCKED' })
       .expect(409);
-    await test
-      .http()
-      .patch(`/admin/users/${admin.id}/role`)
-      .auth(admin.accessToken, { type: 'bearer' })
-      .send({ role: 'USER' })
-      .expect(409);
+    for (const role of ['CUSTOMER', 'EMPLOYER']) {
+      await test
+        .http()
+        .patch(`/admin/users/${admin.id}/role`)
+        .auth(admin.accessToken, { type: 'bearer' })
+        .send({ role })
+        .expect(409);
+    }
     await test
       .http()
       .delete(`/admin/users/${admin.id}`)
@@ -481,6 +532,58 @@ describe('Identity authentication and account HTTP flows', () => {
       .send({ currentPassword: TEST_PASSWORD })
       .expect(409);
     await me(admin.accessToken).expect(200);
+  });
+
+  it('assigns and filters EMPLOYER without granting administrative privileges and revokes prior role sessions', async () => {
+    const admin = await createAdmin();
+    const user = await test.register('employer@example.com');
+    expect(user.role).toBe('CUSTOMER');
+    const customerSession = await test.login(user.email);
+    const changeRole = (role: string) =>
+      test
+        .http()
+        .patch(`/admin/users/${user.id}/role`)
+        .auth(admin.accessToken, { type: 'bearer' })
+        .send({ role });
+    // USER is only a historical value handled by the database migration.
+    await changeRole('USER').expect(400);
+    const changed = await changeRole('EMPLOYER').expect(200);
+    expect(changed.body.role).toBe('EMPLOYER');
+    await me(customerSession.accessToken).expect(401);
+    await refresh(customerSession.refreshToken).expect(401);
+
+    const employerSession = await test.login(user.email);
+    const rotated = await refresh(employerSession.refreshToken).expect(200);
+    const profile = await me(rotated.body.accessToken).expect(200);
+    expect(profile.body.role).toBe('EMPLOYER');
+    await test
+      .http()
+      .get('/admin/users')
+      .auth(rotated.body.accessToken, { type: 'bearer' })
+      .expect(403);
+    await test
+      .http()
+      .patch(`/admin/users/${user.id}/role`)
+      .auth(rotated.body.accessToken, { type: 'bearer' })
+      .send({ role: 'ADMIN' })
+      .expect(403);
+    const employers = await test
+      .http()
+      .get('/admin/users?role=EMPLOYER')
+      .auth(admin.accessToken, { type: 'bearer' })
+      .expect(200);
+    expect(employers.body.total).toBe(1);
+    expect(employers.body.users.map((item: { id: string }) => item.id)).toEqual(
+      [user.id],
+    );
+
+    await changeRole('CUSTOMER').expect(200);
+    await me(rotated.body.accessToken).expect(401);
+    await refresh(rotated.body.refreshToken).expect(401);
+    const restored = await me(
+      (await test.login(user.email)).accessToken,
+    ).expect(200);
+    expect(restored.body.role).toBe('CUSTOMER');
   });
 
   it('lets admins soft-delete users and removes them from list/detail responses', async () => {

@@ -29,7 +29,9 @@ interface Profile {
   id: string;
   fullName: string;
   email: string;
+  phoneNumber: string | null;
   avatarUrl: string | null;
+  isEmailVerified: boolean;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -133,11 +135,18 @@ describe('User profile HTTP API', () => {
       where: { id: profile.id },
       data: {
         fullName: profile.fullName,
-        avatarUrl: null,
+        phoneNumber: null,
+        emailVerifiedAt: null,
         status: 'ACTIVE',
         deletedAt: null,
       },
     });
+    await prisma.userProfile.upsert({
+      where: { userId: profile.id },
+      create: { userId: profile.id, avatarUrl: null },
+      update: { avatarUrl: null, updatedAt: new Date() },
+    });
+    await prisma.rateLimitBucket.deleteMany();
   });
 
   afterAll(async () => {
@@ -158,9 +167,11 @@ describe('User profile HTTP API', () => {
       id: profile.id,
       fullName: profile.fullName,
       email: profile.email,
+      phoneNumber: null,
       avatarUrl: null,
+      isEmailVerified: false,
       status: 'ACTIVE',
-      role: 'USER',
+      role: 'CUSTOMER',
       emailVerifiedAt: null,
       createdAt: profile.createdAt,
       updatedAt: expect.any(String),
@@ -178,19 +189,34 @@ describe('User profile HTTP API', () => {
       id: profile.id,
       fullName: 'Updated Name',
       email: profile.email,
+      phoneNumber: null,
       avatarUrl,
+      isEmailVerified: false,
       status: 'ACTIVE',
-      role: 'USER',
+      role: 'CUSTOMER',
       emailVerifiedAt: null,
       createdAt: profile.createdAt,
       updatedAt: expect.any(String),
     });
     expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: profile.id } }),
-    ).toMatchObject({ fullName: 'Updated Name', avatarUrl });
+      await prisma.user.findUniqueOrThrow({
+        where: { id: profile.id },
+        include: { profile: true },
+      }),
+    ).toMatchObject({ fullName: 'Updated Name', profile: { avatarUrl } });
     expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: otherProfile.id } }),
-    ).toMatchObject({ fullName: otherProfile.fullName, avatarUrl: null });
+      await prisma.user.findUniqueOrThrow({
+        where: { id: otherProfile.id },
+        include: { profile: true },
+      }),
+    ).toMatchObject({
+      fullName: otherProfile.fullName,
+      profile: { avatarUrl: null },
+    });
+    const columns = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+      'PRAGMA table_info("User")',
+    );
+    expect(columns.map((column) => column.name)).not.toContain('avatarUrl');
 
     const fetched = await http()
       .get('/user/me')
@@ -214,8 +240,208 @@ describe('User profile HTTP API', () => {
       avatarUrl: null,
     });
     expect(
+      await prisma.user.findUniqueOrThrow({
+        where: { id: profile.id },
+        include: { profile: true },
+      }),
+    ).toMatchObject({
+      fullName: 'New Name',
+      profile: { avatarUrl: null },
+    });
+  });
+
+  it('registers a trimmed optional phone and stores the avatar in its separate profile', async () => {
+    const response = await http()
+      .post('/auth/register')
+      .send({
+        fullName: 'Phone User',
+        email: 'phone@example.com',
+        password,
+        phoneNumber: '  +84901234567  ',
+        avatarUrl,
+      })
+      .expect(201);
+    expect(response.body).toMatchObject({
+      phoneNumber: '+84901234567',
+      avatarUrl,
+      isEmailVerified: false,
+      role: 'CUSTOMER',
+    });
+    const stored = await prisma.user.findUniqueOrThrow({
+      where: { id: response.body.id },
+      include: { profile: true },
+    });
+    expect(stored).toMatchObject({
+      phoneNumber: '+84901234567',
+      profile: { avatarUrl },
+    });
+    expect(stored).not.toHaveProperty('avatarUrl');
+
+    const nullable = await http()
+      .post('/auth/register')
+      .send({
+        fullName: 'No Phone',
+        email: 'no-phone@example.com',
+        password,
+        phoneNumber: null,
+      })
+      .expect(201);
+    expect(nullable.body).toMatchObject({ phoneNumber: null, avatarUrl: null });
+    expect(profile.phoneNumber).toBeNull();
+  });
+
+  it('updates, preserves and explicitly clears a phone without revoking the session', async () => {
+    const changed = await authenticatedPatch({
+      phoneNumber: '  0901234567  ',
+      avatarUrl,
+    }).expect(200);
+    expect(changed.body).toMatchObject({
+      phoneNumber: '0901234567',
+      avatarUrl,
+    });
+    const omitted = await authenticatedPatch({
+      fullName: 'Phone Preserved',
+    }).expect(200);
+    expect(omitted.body).toMatchObject({
+      phoneNumber: '0901234567',
+      avatarUrl,
+    });
+    const cleared = await authenticatedPatch({ phoneNumber: null }).expect(200);
+    expect(cleared.body).toMatchObject({ phoneNumber: null, avatarUrl });
+    expect(
       await prisma.user.findUniqueOrThrow({ where: { id: profile.id } }),
-    ).toMatchObject({ fullName: 'New Name', avatarUrl: null });
+    ).toMatchObject({ phoneNumber: null, authVersion: 0 });
+    await http()
+      .get('/user/me')
+      .set('Authorization', `Bearer ${tokens.accessToken}`)
+      .expect(200);
+  });
+
+  it.each([
+    '',
+    '   ',
+    '123456',
+    '1234567890123456',
+    '090-123-4567',
+    '+84 901234567',
+    'phone-number',
+    901234567,
+    {},
+    [],
+  ])(
+    'rejects invalid phone %j before changing either account or profile',
+    async (phoneNumber) => {
+      await authenticatedPatch({
+        phoneNumber: '+84901234567',
+        avatarUrl,
+      }).expect(200);
+      const before = await prisma.user.findUniqueOrThrow({
+        where: { id: profile.id },
+        include: { profile: true },
+      });
+      await authenticatedPatch({
+        fullName: 'Must Not Persist',
+        phoneNumber,
+        avatarUrl: null,
+      }).expect(400);
+      expect(
+        await prisma.user.findUniqueOrThrow({
+          where: { id: profile.id },
+          include: { profile: true },
+        }),
+      ).toEqual(before);
+      await http()
+        .post('/auth/register')
+        .send({
+          fullName: 'Invalid Phone',
+          email: 'invalid-phone@example.com',
+          password,
+          phoneNumber,
+          avatarUrl,
+        })
+        .expect(400);
+      expect(
+        await prisma.user.findUnique({
+          where: { emailNormalized: 'invalid-phone@example.com' },
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it('rolls back account edits when the profile write fails', async () => {
+    const before = await prisma.user.findUniqueOrThrow({
+      where: { id: profile.id },
+      include: { profile: true },
+    });
+    await prisma.$executeRawUnsafe(`
+      CREATE TRIGGER reject_profile_edit BEFORE UPDATE OF "avatarUrl" ON "UserProfile"
+      WHEN NEW."userId" = '${profile.id}'
+      BEGIN SELECT RAISE(ABORT, 'profile write rejected for test'); END
+    `);
+    try {
+      await authenticatedPatch({
+        fullName: 'Must Roll Back',
+        phoneNumber: '+84901234567',
+        avatarUrl,
+      }).expect(500);
+      expect(
+        await prisma.user.findUniqueOrThrow({
+          where: { id: profile.id },
+          include: { profile: true },
+        }),
+      ).toEqual(before);
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER IF EXISTS reject_profile_edit',
+      );
+    }
+  });
+
+  it('projects the latest account or profile timestamp and derives verification state', async () => {
+    const profileUpdatedAt = new Date('2030-01-01T00:00:00.000Z');
+    await prisma.userProfile.update({
+      where: { userId: profile.id },
+      data: { avatarUrl, updatedAt: profileUpdatedAt },
+    });
+    const profileNewer = await http()
+      .get('/user/me')
+      .set('Authorization', `Bearer ${tokens.accessToken}`)
+      .expect(200);
+    expect(profileNewer.body).toMatchObject({
+      avatarUrl,
+      updatedAt: profileUpdatedAt.toISOString(),
+      isEmailVerified: false,
+    });
+    const accountUpdatedAt = new Date('2031-01-01T00:00:00.000Z');
+    const verifiedAt = new Date('2026-11-01T00:00:00.000Z');
+    await prisma.user.update({
+      where: { id: profile.id },
+      data: { emailVerifiedAt: verifiedAt, updatedAt: accountUpdatedAt },
+    });
+    const accountNewer = await http()
+      .get('/user/me')
+      .set('Authorization', `Bearer ${tokens.accessToken}`)
+      .expect(200);
+    expect(accountNewer.body).toMatchObject({
+      updatedAt: accountUpdatedAt.toISOString(),
+      emailVerifiedAt: verifiedAt.toISOString(),
+      isEmailVerified: true,
+    });
+  });
+
+  it('reads a missing profile as a null avatar and recreates it on edit', async () => {
+    await prisma.userProfile.delete({ where: { userId: profile.id } });
+    const read = await http()
+      .get('/user/me')
+      .set('Authorization', `Bearer ${tokens.accessToken}`)
+      .expect(200);
+    expect(read.body.avatarUrl).toBeNull();
+    await authenticatedPatch({ avatarUrl }).expect(200);
+    expect(
+      await prisma.userProfile.findUniqueOrThrow({
+        where: { userId: profile.id },
+      }),
+    ).toMatchObject({ avatarUrl });
   });
 
   it('rejects an attempt to select another user or edit protected fields', async () => {
@@ -259,8 +485,15 @@ describe('User profile HTTP API', () => {
     async (_label, body) => {
       await authenticatedPatch(body as Record<string, unknown>).expect(400);
       expect(
-        await prisma.user.findUniqueOrThrow({ where: { id: profile.id } }),
-      ).toMatchObject({ fullName: profile.fullName, avatarUrl: null });
+        await prisma.user.findUniqueOrThrow({
+          where: { id: profile.id },
+          include: { profile: true },
+        }),
+      ).toMatchObject({
+        fullName: profile.fullName,
+        phoneNumber: null,
+        profile: { avatarUrl: null },
+      });
     },
   );
 
@@ -291,15 +524,26 @@ describe('User profile HTTP API', () => {
       }
       await get.expect(401);
 
-      const patch = http().patch('/user/me').send({ fullName: 'Unauthorized' });
+      const patch = http().patch('/user/me').send({
+        fullName: 'Unauthorized',
+        phoneNumber: '+84901234567',
+        avatarUrl,
+      });
       if (authorization) {
         patch.set('Authorization', authorization);
       }
       await patch.expect(401);
     }
     expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: profile.id } }),
-    ).toMatchObject({ fullName: profile.fullName });
+      await prisma.user.findUniqueOrThrow({
+        where: { id: profile.id },
+        include: { profile: true },
+      }),
+    ).toMatchObject({
+      fullName: profile.fullName,
+      phoneNumber: null,
+      profile: { avatarUrl: null },
+    });
   });
 
   it.each([
@@ -312,10 +556,21 @@ describe('User profile HTTP API', () => {
       .get('/user/me')
       .set('Authorization', `Bearer ${tokens.accessToken}`)
       .expect(401);
-    await authenticatedPatch({ fullName: 'Unauthorized' }).expect(401);
+    await authenticatedPatch({
+      fullName: 'Unauthorized',
+      phoneNumber: '+84901234567',
+      avatarUrl,
+    }).expect(401);
     expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: profile.id } }),
-    ).toMatchObject({ fullName: profile.fullName });
+      await prisma.user.findUniqueOrThrow({
+        where: { id: profile.id },
+        include: { profile: true },
+      }),
+    ).toMatchObject({
+      fullName: profile.fullName,
+      phoneNumber: null,
+      profile: { avatarUrl: null },
+    });
   });
 
   it('rejects a validly signed access token for a nonexistent user', async () => {

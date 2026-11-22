@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { User } from '../../domain/entities/user.interface.js';
-import type { UserRole } from '../../domain/types/user-role.types.js';
+import type { User } from '../../domain/entities/user.js';
+import type { UserRole } from '../../domain/types/user-role.type.js';
 import type { UserStatus } from '../../domain/types/user-status.type.js';
 import {
   AdminRequiredError,
   InvalidAccountInputError,
   LastAdminError,
   UserNotFoundError,
-} from '../errors/users.errors.js';
+} from '../../domain/errors/users.errors.js';
 import type {
   AdminUserRepository,
   UserListQuery,
