@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { MEDIA_MAX_BYTES } from '../domain/media-asset.js';
-import { MediaValidationError } from '../domain/media.errors.js';
+import { MEDIA_MAX_BYTES } from '../../domain/entities/media-asset.js';
+import { MediaValidationError } from '../../domain/errors/media.errors.js';
 import { SharpImageProcessor } from './sharp-image.processor.js';
 
 describe('SharpImageProcessor', () => {

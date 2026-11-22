@@ -1,5 +1,5 @@
-import type { MediaActor } from '../contracts/media.api.js';
-import type { MediaAsset } from '../domain/media-asset.js';
+import type { MediaActor } from '../../contracts/media.api.js';
+import type { MediaAsset } from '../../domain/entities/media-asset.js';
 
 export interface MediaRepository {
   create(asset: MediaAsset, actor: MediaActor): Promise<MediaAsset>;

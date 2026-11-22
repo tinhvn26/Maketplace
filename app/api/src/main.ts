@@ -1,11 +1,9 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule, ObserveInstrument } from './app.module.js';
+import { AppModule } from './app.module.js';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    instrument: ObserveInstrument,
-  });
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -13,6 +11,8 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  app.enableShutdownHooks();
   await app.listen(process.env.PORT ?? 3000);
 }
+
 await bootstrap();

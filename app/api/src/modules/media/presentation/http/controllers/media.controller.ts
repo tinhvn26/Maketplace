@@ -19,13 +19,13 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { IsUUID, ValidateIf } from 'class-validator';
 import type { Response } from 'express';
-import { MediaService } from '../application/media.service.js';
-import type { MediaActor } from '../contracts/media.api.js';
-import { MEDIA_MAX_BYTES } from '../domain/media-asset.js';
-import { MediaValidationError } from '../domain/media.errors.js';
-import type { AuthenticatedRequest } from '../../identity/presentation/http/guards/access-token.guard.js';
-import { MediaAuthenticatedGuard } from './media-authenticated.guard.js';
-import { MediaExceptionFilter } from './media-exception.filter.js';
+import { MediaService } from '../../../application/media.service.js';
+import type { MediaActor } from '../../../contracts/media.api.js';
+import { MEDIA_MAX_BYTES } from '../../../domain/entities/media-asset.js';
+import { MediaValidationError } from '../../../domain/errors/media.errors.js';
+import type { AuthenticatedRequest } from '../../../../identity/contracts/identity.http.js';
+import { MediaAuthenticatedGuard } from '../guards/media-authenticated.guard.js';
+import { MediaExceptionFilter } from '../filters/media-exception.filter.js';
 
 class UploadMediaRequest {
   @ValidateIf((_object, value) => value !== undefined)

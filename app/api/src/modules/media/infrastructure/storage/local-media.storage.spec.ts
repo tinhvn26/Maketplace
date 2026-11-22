@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   MediaNotFoundError,
   MediaValidationError,
-} from '../domain/media.errors.js';
+} from '../../domain/errors/media.errors.js';
 import { LocalMediaStorage } from './local-media.storage.js';
 
 describe('LocalMediaStorage', () => {

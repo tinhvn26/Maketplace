@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../platform/database/prisma.service.js';
-import type { Prisma } from '../../../platform/database/generated/client.js';
-import type { MediaRepository } from '../application/media.ports.js';
-import type { MediaActor } from '../contracts/media.api.js';
-import type { MediaAsset } from '../domain/media-asset.js';
+import { PrismaService } from '../../../../platform/database/prisma.service.js';
+import type { Prisma } from '../../../../platform/database/generated/client.js';
+import type { MediaRepository } from '../../application/ports/media.ports.js';
+import type { MediaActor } from '../../contracts/media.api.js';
+import type { MediaAsset } from '../../domain/entities/media-asset.js';
 import {
   MediaForbiddenError,
   MediaInUseError,
   MediaNotFoundError,
-} from '../domain/media.errors.js';
+} from '../../domain/errors/media.errors.js';
 import {
   ShopNotFoundError,
   ShopUnavailableError,
-} from '../../shops/contracts/shops.api.js';
+} from '../../../shops/contracts/shops.api.js';
 
 @Injectable()
 export class PrismaMediaRepository implements MediaRepository {

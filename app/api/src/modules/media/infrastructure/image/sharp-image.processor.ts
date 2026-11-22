@@ -2,13 +2,13 @@ import sharp from 'sharp';
 import type {
   MediaImageProcessor,
   ProcessedMediaImage,
-} from '../application/media.ports.js';
+} from '../../application/ports/media.ports.js';
 import {
   MEDIA_MAX_BYTES,
   MEDIA_MAX_DIMENSION,
   MEDIA_MAX_PIXELS,
-} from '../domain/media-asset.js';
-import { MediaValidationError } from '../domain/media.errors.js';
+} from '../../domain/entities/media-asset.js';
+import { MediaValidationError } from '../../domain/errors/media.errors.js';
 
 export class SharpImageProcessor implements MediaImageProcessor {
   async process(bytes: Uint8Array): Promise<ProcessedMediaImage> {

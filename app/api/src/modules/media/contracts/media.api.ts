@@ -24,4 +24,4 @@ export {
   MediaNotFoundError,
   MediaForbiddenError,
   MediaInUseError,
-} from '../domain/media.errors.js';
+} from '../domain/errors/media.errors.js';

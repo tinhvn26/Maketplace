@@ -3,20 +3,20 @@ import type {
   MediaAssets,
   ResolvedMediaAsset,
 } from '../contracts/media.api.js';
-import { MEDIA_MAX_BYTES } from '../domain/media-asset.js';
-import type { MediaAsset } from '../domain/media-asset.js';
+import { MEDIA_MAX_BYTES } from '../domain/entities/media-asset.js';
+import type { MediaAsset } from '../domain/entities/media-asset.js';
 import {
   MediaForbiddenError,
   MediaNotFoundError,
   MediaValidationError,
-} from '../domain/media.errors.js';
+} from '../domain/errors/media.errors.js';
 import type {
   MediaImageProcessor,
   MediaRepository,
   MediaRuntime,
   MediaShopAccess,
   MediaStorage,
-} from './media.ports.js';
+} from './ports/media.ports.js';
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

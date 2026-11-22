@@ -8,15 +8,15 @@ import type { ShopAccess } from '../shops/contracts/shops.api.js';
 import { ShopsModule } from '../shops/shops.module.js';
 import { MediaService } from './application/media.service.js';
 import { MEDIA_ASSETS } from './contracts/media.api.js';
-import { LocalMediaStorage } from './infrastructure/local-media.storage.js';
-import { PrismaMediaRepository } from './infrastructure/prisma-media.repository.js';
-import { SharpImageProcessor } from './infrastructure/sharp-image.processor.js';
-import { MediaAuthenticatedGuard } from './presentation/media-authenticated.guard.js';
-import { MediaExceptionFilter } from './presentation/media-exception.filter.js';
+import { LocalMediaStorage } from './infrastructure/storage/local-media.storage.js';
+import { PrismaMediaRepository } from './infrastructure/persistence/prisma-media.repository.js';
+import { SharpImageProcessor } from './infrastructure/image/sharp-image.processor.js';
+import { MediaAuthenticatedGuard } from './presentation/http/guards/media-authenticated.guard.js';
+import { MediaExceptionFilter } from './presentation/http/filters/media-exception.filter.js';
 import {
   MediaController,
   MediaPublicController,
-} from './presentation/media.controller.js';
+} from './presentation/http/controllers/media.controller.js';
 
 function mediaBaseUrl(): string {
   const url = new URL(

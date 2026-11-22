@@ -12,13 +12,13 @@ import {
   it,
   vi,
 } from 'vitest';
-import { PrismaService } from '../../../platform/database/prisma.service.js';
-import type { MediaAsset } from '../domain/media-asset.js';
+import { PrismaService } from '../../../../platform/database/prisma.service.js';
+import type { MediaAsset } from '../../domain/entities/media-asset.js';
 import {
   MediaForbiddenError,
   MediaInUseError,
-} from '../domain/media.errors.js';
-import { ShopUnavailableError } from '../../shops/contracts/shops.api.js';
+} from '../../domain/errors/media.errors.js';
+import { ShopUnavailableError } from '../../../shops/contracts/shops.api.js';
 import { PrismaMediaRepository } from './prisma-media.repository.js';
 
 describe('PrismaMediaRepository live authorization and usage transactions', () => {
@@ -54,7 +54,7 @@ describe('PrismaMediaRepository live authorization and usage transactions', () =
     }).connect();
     try {
       const migrations = new URL(
-        '../../../../prisma/migrations/',
+        '../../../../../prisma/migrations/',
         import.meta.url,
       );
       for (const folder of (await readdir(migrations, { withFileTypes: true }))

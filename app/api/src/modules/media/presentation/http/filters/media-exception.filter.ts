@@ -5,13 +5,13 @@ import {
   ShopAccessDeniedError,
   ShopNotFoundError,
   ShopUnavailableError,
-} from '../../shops/contracts/shops.api.js';
+} from '../../../../shops/contracts/shops.api.js';
 import {
   MediaForbiddenError,
   MediaInUseError,
   MediaNotFoundError,
   MediaValidationError,
-} from '../domain/media.errors.js';
+} from '../../../domain/errors/media.errors.js';
 
 type MediaError =
   | MediaValidationError

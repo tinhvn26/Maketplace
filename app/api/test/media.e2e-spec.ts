@@ -292,7 +292,7 @@ describe('Media upload, image delivery and usage protection', () => {
     expect(asset.shopId).toBeNull();
     await test.prisma.user.update({
       where: { id: owner.id },
-      data: { role: 'USER' },
+      data: { role: 'CUSTOMER' },
     });
     await upload(images.png, adminToken, null).expect(403);
     await test

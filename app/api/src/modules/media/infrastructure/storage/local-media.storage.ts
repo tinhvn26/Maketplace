@@ -7,11 +7,11 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import type { MediaStorage } from '../application/media.ports.js';
+import type { MediaStorage } from '../../application/ports/media.ports.js';
 import {
   MediaNotFoundError,
   MediaValidationError,
-} from '../domain/media.errors.js';
+} from '../../domain/errors/media.errors.js';
 
 const storageKeyPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:png|jpg|webp)$/;

@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MediaActor } from '../contracts/media.api.js';
-import type { MediaAsset } from '../domain/media-asset.js';
+import type { MediaAsset } from '../domain/entities/media-asset.js';
 import {
   MediaForbiddenError,
   MediaInUseError,
-} from '../domain/media.errors.js';
+} from '../domain/errors/media.errors.js';
 import type {
   MediaImageProcessor,
   MediaRepository,
   MediaShopAccess,
   MediaStorage,
-} from './media.ports.js';
+} from './ports/media.ports.js';
 import { MediaService } from './media.service.js';
 
 const id = '44444444-4444-4444-8444-444444444444';
