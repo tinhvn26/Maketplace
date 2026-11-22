@@ -26,7 +26,7 @@ import {
 } from '../dto/catalog.requests.js';
 import { CatalogExceptionFilter } from '../filters/catalog-exception.filter.js';
 import { CatalogAdminGuard } from '../guards/catalog-admin.guard.js';
-import type { AuthenticatedRequest } from '../../../../identity/presentation/http/guards/access-token.guard.js';
+import type { AuthenticatedRequest } from '../../../../identity/contracts/identity.http.js';
 import { catalogContext } from '../catalog-actor.js';
 
 @Controller('admin/catalog')

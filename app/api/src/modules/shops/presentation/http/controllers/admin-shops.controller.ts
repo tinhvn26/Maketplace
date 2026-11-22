@@ -7,7 +7,7 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import { AdminRoleGuard } from '../../../../identity/presentation/http/guards/admin-role.guard.js';
+import { AdminRoleGuard } from '../../../../identity/contracts/identity.http.js';
 import { ShopsService } from '../../../application/shops.service.js';
 import type { ShopActor } from '../../../contracts/shops.api.js';
 import { CurrentShopActor } from '../decorators/shop-actor.decorator.js';

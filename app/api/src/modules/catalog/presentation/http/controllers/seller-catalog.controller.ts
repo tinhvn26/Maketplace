@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { IsInt, Max, Min, ValidateIf } from 'class-validator';
-import type { AuthenticatedRequest } from '../../../../identity/presentation/http/guards/access-token.guard.js';
+import type { AuthenticatedRequest } from '../../../../identity/contracts/identity.http.js';
 import { CatalogSellerService } from '../../../application/seller/catalog-seller.service.js';
 import {
   AddVariantRequest,

@@ -172,7 +172,7 @@ describe('Shops ownership and live availability', () => {
       .send({ version: 1, name: 'Blocked' })
       .expect(409);
     await expect(
-      access.requireManageable(shop.id, { userId: owner.id, role: 'USER' }),
+      access.requireManageable(shop.id, { userId: owner.id, role: 'CUSTOMER' }),
     ).rejects.toBeInstanceOf(ShopUnavailableError);
     await expect(access.assertSellable([shop.id])).rejects.toBeInstanceOf(
       ShopUnavailableError,
@@ -192,7 +192,7 @@ describe('Shops ownership and live availability', () => {
   it('rechecks revoked accounts and current ownership through the public access port', async () => {
     const { body: shop } = await create().expect(201);
     await expect(
-      access.requireManageable(shop.id, { userId: other.id, role: 'USER' }),
+      access.requireManageable(shop.id, { userId: other.id, role: 'CUSTOMER' }),
     ).rejects.toBeInstanceOf(ShopAccessDeniedError);
     await test.prisma.user.update({
       where: { id: owner.id },
@@ -205,7 +205,7 @@ describe('Shops ownership and live availability', () => {
       .expect(401);
     await test.http().get(`/shops/${shop.id}`).expect(404);
     await expect(
-      access.requireManageable(shop.id, { userId: owner.id, role: 'USER' }),
+      access.requireManageable(shop.id, { userId: owner.id, role: 'CUSTOMER' }),
     ).rejects.toBeInstanceOf(ShopAccessDeniedError);
     await expect(access.assertSellable([shop.id])).rejects.toBeInstanceOf(
       ShopUnavailableError,

@@ -1,8 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import type { Response } from 'express';
-import { AccessTokenGuard } from '../../../../identity/presentation/http/guards/access-token.guard.js';
-import { AdminRoleGuard } from '../../../../identity/presentation/http/guards/admin-role.guard.js';
+import {
+  AccessTokenGuard,
+  AdminRoleGuard,
+} from '../../../../identity/contracts/identity.http.js';
 
 /** Reuses Identity's exported providers without exposing its internal ports. */
 @Injectable()

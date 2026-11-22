@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
-import { AccessTokenGuard } from '../../../../identity/presentation/http/guards/access-token.guard.js';
+import { AccessTokenGuard } from '../../../../identity/contracts/identity.http.js';
 
 @Injectable()
 export class CatalogSellerGuard implements CanActivate {

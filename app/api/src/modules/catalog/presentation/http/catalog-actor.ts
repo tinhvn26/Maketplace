@@ -1,5 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
-import type { AuthenticatedRequest } from '../../../identity/presentation/http/guards/access-token.guard.js';
+import type { AuthenticatedRequest } from '../../../identity/contracts/identity.http.js';
 import type {
   CatalogActor,
   CatalogMutationContext,

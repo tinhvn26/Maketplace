@@ -21,7 +21,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import type { AuthenticatedRequest } from '../../../../identity/presentation/http/guards/access-token.guard.js';
+import type { AuthenticatedRequest } from '../../../../identity/contracts/identity.http.js';
 import { CatalogReviewService } from '../../../application/review/catalog-review.service.js';
 import { ProductVersionRequest } from '../dto/catalog.requests.js';
 import { CatalogExceptionFilter } from '../filters/catalog-exception.filter.js';
