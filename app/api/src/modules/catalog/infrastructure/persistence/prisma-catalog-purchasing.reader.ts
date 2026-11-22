@@ -1,10 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
 import type { CatalogPurchasingReader } from '../../application/ports/catalog-purchasing.reader.js';
+import type { CatalogVariants } from '../../contracts/catalog-variants.api.js';
 
 @Injectable()
-export class PrismaCatalogPurchasingReader implements CatalogPurchasingReader {
+export class PrismaCatalogPurchasingReader implements CatalogPurchasingReader, CatalogVariants {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findVariantShops(ids: readonly string[]) {
+    const rows = await this.prisma.catalogVariant.findMany({
+      where: { id: { in: [...new Set(ids)] } },
+      select: { id: true, product: { select: { shopId: true } } },
+    });
+    return rows.map((row) => ({
+      variantId: row.id,
+      shopId: row.product.shopId,
+    }));
+  }
 
   async findPurchasableVariants(ids: readonly string[]) {
     // Prisma may load related products in a separate statement. Read prices and

@@ -32,6 +32,7 @@ import type { CatalogWorkflowRepository } from './application/ports/catalog-work
 import { CATALOG_PURCHASING_READER } from './application/ports/catalog-purchasing.reader.js';
 import type { CatalogPurchasingReader } from './application/ports/catalog-purchasing.reader.js';
 import { CATALOG_PRICING } from './contracts/catalog-pricing.api.js';
+import { CATALOG_VARIANTS } from './contracts/catalog-variants.api.js';
 import { PrismaCatalogWorkflowRepository } from './infrastructure/persistence/prisma-catalog-workflow.repository.js';
 import { PrismaCatalogPurchasingReader } from './infrastructure/persistence/prisma-catalog-purchasing.reader.js';
 import { SellerCatalogController } from './presentation/http/controllers/seller-catalog.controller.js';
@@ -60,6 +61,7 @@ import { CatalogSellerGuard } from './presentation/http/guards/catalog-seller.gu
       provide: CATALOG_PURCHASING_READER,
       useClass: PrismaCatalogPurchasingReader,
     },
+    { provide: CATALOG_VARIANTS, useExisting: CATALOG_PURCHASING_READER },
     {
       provide: CatalogAdminService,
       inject: [CATALOG_REPOSITORY, MEDIA_ASSETS],
@@ -122,7 +124,7 @@ import { CatalogSellerGuard } from './presentation/http/guards/catalog-seller.gu
     CatalogSellerGuard,
     CatalogExceptionFilter,
   ],
-  exports: [CatalogQueryService, CATALOG_PRICING],
+  exports: [CatalogQueryService, CATALOG_PRICING, CATALOG_VARIANTS],
 })
 export class CatalogModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
