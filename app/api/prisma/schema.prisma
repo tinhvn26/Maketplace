@@ -12,20 +12,29 @@ model User {
   fullName        String
   emailNormalized String          @unique
   passwordHash    String
-  avatarUrl       String?
+  phoneNumber     String?
   status          String          @default("ACTIVE")
-  role            String          @default("USER")
+  role            String          @default("CUSTOMER")
   emailVerifiedAt DateTime?
   authVersion     Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   deletedAt       DateTime?
+  profile         UserProfile?
   sessions        AuthSession[]
   accountActions  AccountAction[]
   shops           Shop[]
 
   @@index([deletedAt])
   @@index([role, status, deletedAt])
+}
+
+model UserProfile {
+  userId    String   @id
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuthSession {
@@ -137,31 +146,33 @@ model CatalogProduct {
 }
 
 model CatalogVariant {
-  id          String         @id
+  id          String           @id
   productId   String
-  sku         String         @unique
+  sku         String           @unique
   name        String
   priceAmount Int
-  currency    String         @default("VND")
-  isActive    Boolean        @default(true)
-  attributes  Json           @default("{}")
-  images      Json           @default("[]")
-  product     CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  currency    String           @default("VND")
+  isActive    Boolean          @default(true)
+  attributes  Json             @default("{}")
+  images      Json             @default("[]")
+  product     CatalogProduct   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stocks      InventoryStock[]
 
   @@index([productId, isActive])
 }
 
 model Shop {
-  id        String           @id
-  name      String
-  slug      String           @unique
-  ownerId   String
-  status    String           @default("ACTIVE")
-  version   Int              @default(0)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  owner     User             @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  products  CatalogProduct[]
+  id         String               @id
+  name       String
+  slug       String               @unique
+  ownerId    String
+  status     String               @default("ACTIVE")
+  version    Int                  @default(0)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  owner      User                 @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  products   CatalogProduct[]
+  warehouses InventoryWarehouse[]
 
   @@index([ownerId, status])
 }
@@ -232,4 +243,83 @@ model CatalogAudit {
 
   @@index([entityType, entityId, createdAt, id])
   @@index([shopId, createdAt, id])
+}
+
+model InventoryWarehouse {
+  id        String           @id
+  shopId    String?
+  name      String
+  code      String
+  priority  Int              @default(100)
+  isActive  Boolean          @default(true)
+  version   Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  shop      Shop?            @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  stocks    InventoryStock[]
+
+  @@unique([shopId, code])
+  @@index([shopId, isActive])
+}
+
+model InventoryStock {
+  id          String              @id
+  warehouseId String
+  variantId   String
+  onHand      Int                 @default(0)
+  reserved    Int                 @default(0)
+  version     Int                 @default(0)
+  updatedAt   DateTime            @updatedAt
+  warehouse   InventoryWarehouse  @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  variant     CatalogVariant      @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  movements   InventoryMovement[]
+
+  @@unique([warehouseId, variantId])
+  @@index([variantId])
+}
+
+model InventoryMovement {
+  id            String         @id @default(uuid())
+  stockId       String
+  type          String
+  onHandDelta   Int
+  reservedDelta Int
+  reason        String
+  actorUserId   String?
+  reservationId String?
+  transferId    String?
+  createdAt     DateTime       @default(now())
+  stock         InventoryStock @relation(fields: [stockId], references: [id], onDelete: Restrict)
+
+  @@index([stockId, createdAt])
+  @@index([reservationId])
+}
+
+model InventoryReservation {
+  id             String                     @id
+  idempotencyKey String                     @unique
+  requestHash    String
+  reference      String
+  status         String                     @default("ACTIVE")
+  expiresAt      DateTime?
+  version        Int                        @default(0)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  lines          InventoryReservationLine[]
+
+  @@index([status, expiresAt])
+}
+
+model InventoryReservationLine {
+  id            String               @id @default(uuid())
+  reservationId String
+  stockId       String
+  warehouseId   String
+  variantId     String
+  position      Int
+  quantity      Int
+  shippedAt     DateTime?
+  reservation   InventoryReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
 }
