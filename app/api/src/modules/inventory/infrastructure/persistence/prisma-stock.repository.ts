@@ -64,11 +64,15 @@ export class PrismaStockRepository implements StockRepository {
     });
     if (updated.count !== 1) throw new InventoryVersionConflictError();
     return this.toStock(
-      await this.db.inventoryStock.findUniqueOrThrow({ where: { id: stock.id } }),
+      await this.db.inventoryStock.findUniqueOrThrow({
+        where: { id: stock.id },
+      }),
     );
   }
 
-  async findCandidates(variantIds: readonly string[]): Promise<StockCandidate[]> {
+  async findCandidates(
+    variantIds: readonly string[],
+  ): Promise<StockCandidate[]> {
     const rows = await this.db.inventoryStock.findMany({
       where: { variantId: { in: [...variantIds] } },
       include: { warehouse: { select: { priority: true, isActive: true } } },
@@ -107,7 +111,9 @@ export class PrismaStockRepository implements StockRepository {
   }
 
   async listMovements(filter: StockScopeFilter) {
-    const where: Prisma.InventoryMovementWhereInput = { stock: this.scope(filter) };
+    const where: Prisma.InventoryMovementWhereInput = {
+      stock: this.scope(filter),
+    };
     const [rows, total] = await Promise.all([
       this.db.inventoryMovement.findMany({
         where,
@@ -151,8 +157,12 @@ export class PrismaStockRepository implements StockRepository {
   private scope(filter: StockScopeFilter): Prisma.InventoryStockWhereInput {
     return {
       warehouse: { shopId: filter.shopId },
-      ...(filter.warehouseId === undefined ? {} : { warehouseId: filter.warehouseId }),
-      ...(filter.variantId === undefined ? {} : { variantId: filter.variantId }),
+      ...(filter.warehouseId === undefined
+        ? {}
+        : { warehouseId: filter.warehouseId }),
+      ...(filter.variantId === undefined
+        ? {}
+        : { variantId: filter.variantId }),
     };
   }
 

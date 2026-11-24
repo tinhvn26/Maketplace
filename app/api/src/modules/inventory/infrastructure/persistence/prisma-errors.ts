@@ -1,5 +1,4 @@
 import {
-  InventoryConflictError,
   InventoryNotFoundError,
   InventoryVersionConflictError,
 } from '../../domain/errors/inventory.errors.js';
@@ -14,9 +13,7 @@ export function prismaErrorCode(error: unknown): unknown {
 }
 
 export function isSqliteBusy(error: unknown): boolean {
-  const cause = record(
-    record(record(error)?.meta)?.driverAdapterError,
-  )?.cause;
+  const cause = record(record(record(error)?.meta)?.driverAdapterError)?.cause;
   const code = record(cause)?.originalCode;
   return code === 'SQLITE_BUSY' || code === 'SQLITE_LOCKED';
 }
@@ -38,6 +35,5 @@ export function translateStorageError(
     throw new InventoryNotFoundError(
       'A referenced shop, warehouse or variant no longer exists',
     );
-  if (error instanceof InventoryConflictError) throw error;
   throw error;
 }

@@ -18,8 +18,20 @@ const active = createReservation({
   reference: 'order-1',
   expiresAt: new Date('2026-11-22T00:15:00.000Z'),
   lines: [
-    { stockId: 'a', warehouseId: 'wa', variantId: 'v1', quantity: 2, shippedAt: null },
-    { stockId: 'b', warehouseId: 'wb', variantId: 'v1', quantity: 1, shippedAt: null },
+    {
+      stockId: 'a',
+      warehouseId: 'wa',
+      variantId: 'v1',
+      quantity: 2,
+      shippedAt: null,
+    },
+    {
+      stockId: 'b',
+      warehouseId: 'wb',
+      variantId: 'v1',
+      quantity: 1,
+      shippedAt: null,
+    },
   ],
   now,
 });
@@ -31,17 +43,20 @@ describe('Reservation', () => {
     const first = shipReservationWarehouse(allocated, 'wa', now);
     expect(first.shipped.map((line) => line.stockId)).toEqual(['a']);
     expect(first.reservation.status).toBe('ALLOCATED');
-    expect(() => shipReservationWarehouse(first.reservation, 'wa', now)).toThrow(
-      ReservationStateError,
-    );
-    expect(shipReservationWarehouse(first.reservation, 'wb', now).reservation.status).toBe(
-      'SHIPPED',
-    );
+    expect(() =>
+      shipReservationWarehouse(first.reservation, 'wa', now),
+    ).toThrow(ReservationStateError);
+    expect(
+      shipReservationWarehouse(first.reservation, 'wb', now).reservation.status,
+    ).toBe('SHIPPED');
   });
 
   it('releases only the unshipped part and is idempotent', () => {
-    const partly = shipReservationWarehouse(confirmReservation(active, now), 'wa', now)
-      .reservation;
+    const partly = shipReservationWarehouse(
+      confirmReservation(active, now),
+      'wa',
+      now,
+    ).reservation;
     const { reservation, released } = releaseReservation(partly, now);
     expect(released.map((line) => line.stockId)).toEqual(['b']);
     expect(heldLines(reservation)).toEqual([]);
@@ -53,7 +68,9 @@ describe('Reservation', () => {
     const expired = expireReservation(active, later);
     expect(expired.reservation.status).toBe('EXPIRED');
     expect(expired.released).toHaveLength(2);
-    expect(() => confirmReservation(active, later)).toThrow(ReservationStateError);
+    expect(() => confirmReservation(active, later)).toThrow(
+      ReservationStateError,
+    );
     expect(() => confirmReservation(expired.reservation, later)).toThrow(
       ReservationStateError,
     );
@@ -66,6 +83,8 @@ describe('Reservation', () => {
     let shipped = confirmReservation(active, now);
     shipped = shipReservationWarehouse(shipped, 'wa', now).reservation;
     shipped = shipReservationWarehouse(shipped, 'wb', now).reservation;
-    expect(() => releaseReservation(shipped, now)).toThrow(ReservationStateError);
+    expect(() => releaseReservation(shipped, now)).toThrow(
+      ReservationStateError,
+    );
   });
 });

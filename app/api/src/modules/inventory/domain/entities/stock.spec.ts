@@ -14,7 +14,12 @@ import {
 } from './stock.js';
 
 const now = new Date('2026-11-22T00:00:00.000Z');
-const empty = createStock({ id: 's1', warehouseId: 'w1', variantId: 'v1', now });
+const empty = createStock({
+  id: 's1',
+  warehouseId: 'w1',
+  variantId: 'v1',
+  now,
+});
 
 describe('Stock', () => {
   it('reserves, releases and ships while keeping reserved within on-hand', () => {
@@ -38,11 +43,14 @@ describe('Stock', () => {
     expect(() => adjustStock(stock, -3, now)).toThrow(InsufficientStockError);
   });
 
-  it.each([0, -1, 1.5, Number.NaN])('rejects invalid quantity %s', (quantity) => {
-    expect(() => receiveStock(empty, quantity, now)).toThrow(
-      InventoryValidationError,
-    );
-  });
+  it.each([0, -1, 1.5, Number.NaN])(
+    'rejects invalid quantity %s',
+    (quantity) => {
+      expect(() => receiveStock(empty, quantity, now)).toThrow(
+        InventoryValidationError,
+      );
+    },
+  );
 
   it('rejects a zero adjustment and releasing units that are not reserved', () => {
     expect(() => adjustStock(empty, 0, now)).toThrow(InventoryValidationError);

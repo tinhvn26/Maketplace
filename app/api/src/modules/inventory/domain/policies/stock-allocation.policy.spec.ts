@@ -22,14 +22,21 @@ describe('allocateStock', () => {
   it('prefers lower priority, then more available units, then warehouse id', () => {
     const result = allocateStock(
       [{ variantId: 'v1', quantity: 1 }],
-      [candidate('b', 5), candidate('a', 5), candidate('c', 9), candidate('z', 1, 1)],
+      [
+        candidate('b', 5),
+        candidate('a', 5),
+        candidate('c', 9),
+        candidate('z', 1, 1),
+      ],
     );
     expect(result).toEqual([
       { stockId: 'z-v1', warehouseId: 'z', variantId: 'v1', quantity: 1 },
     ]);
     expect(
-      allocateStock([{ variantId: 'v1', quantity: 1 }], [candidate('b', 5), candidate('a', 5)])[0]
-        .warehouseId,
+      allocateStock(
+        [{ variantId: 'v1', quantity: 1 }],
+        [candidate('b', 5), candidate('a', 5)],
+      )[0].warehouseId,
     ).toBe('a');
   });
 
@@ -48,7 +55,12 @@ describe('allocateStock', () => {
     expect(() =>
       allocateStock(
         [{ variantId: 'v1', quantity: 2 }],
-        [candidate('a', 9, 1, false), candidate('b', 0), candidate('c', 9, 1, true, 'v2'), candidate('d', 1)],
+        [
+          candidate('a', 9, 1, false),
+          candidate('b', 0),
+          candidate('c', 9, 1, true, 'v2'),
+          candidate('d', 1),
+        ],
       ),
     ).toThrow(InsufficientStockError);
   });

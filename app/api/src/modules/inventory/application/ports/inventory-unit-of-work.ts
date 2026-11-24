@@ -14,5 +14,7 @@ export interface InventoryUnitOfWork {
   /** One atomic transaction; everything written inside commits or rolls back together. */
   run<T>(work: (repositories: InventoryRepositories) => Promise<T>): Promise<T>;
   /** Read-only access without taking the write lock. */
-  read<T>(work: (repositories: InventoryRepositories) => Promise<T>): Promise<T>;
+  read<T>(
+    work: (repositories: InventoryRepositories) => Promise<T>,
+  ): Promise<T>;
 }

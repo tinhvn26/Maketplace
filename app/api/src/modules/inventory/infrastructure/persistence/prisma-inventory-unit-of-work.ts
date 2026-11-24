@@ -4,6 +4,7 @@ import type {
   InventoryRepositories,
   InventoryUnitOfWork,
 } from '../../application/ports/inventory-unit-of-work.js';
+import { InventoryConflictError } from '../../domain/errors/inventory.errors.js';
 import { translateStorageError } from './prisma-errors.js';
 import { PrismaReservationRepository } from './prisma-reservation.repository.js';
 import { PrismaStockRepository } from './prisma-stock.repository.js';
@@ -35,9 +36,8 @@ export class PrismaInventoryUnitOfWork implements InventoryUnitOfWork {
         return work(repositories(tx));
       });
     } catch (error) {
-      return translateStorageError(error, () => {
-        throw error;
-      });
+      // A unique violation no repository translated must surface as 409, not 500.
+      return translateStorageError(error, () => new InventoryConflictError());
     }
   }
 

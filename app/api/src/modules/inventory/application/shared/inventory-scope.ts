@@ -1,4 +1,7 @@
-import type { ShopAccess, ShopActor } from '../../../shops/contracts/shops.api.js';
+import type {
+  ShopAccess,
+  ShopActor,
+} from '../../../shops/contracts/shops.api.js';
 import { InventoryAccessDeniedError } from '../../domain/errors/inventory.errors.js';
 
 /** Whose inventory is addressed: one shop's, or the platform's (shopId null). */

@@ -23,17 +23,26 @@ const platform: InventoryScope = { shopId: null };
 describe('Inventory warehouses and stock', () => {
   let store: InMemoryInventory;
   let sequence: number;
-  let requireManageable: ReturnType<typeof vi.fn<ShopAccess['requireManageable']>>;
+  let requireManageable: ReturnType<
+    typeof vi.fn<ShopAccess['requireManageable']>
+  >;
   let warehouses: InventoryWarehouseService;
   let stock: InventoryStockService;
   let availability: InventoryAvailabilityService;
   // variant -> owning shop (null = platform product)
-  const owners: Record<string, string | null> = { v1: 's1', v2: 's1', other: 's2', plat: null };
+  const owners: Record<string, string | null> = {
+    v1: 's1',
+    v2: 's1',
+    other: 's2',
+    plat: null,
+  };
 
   beforeEach(() => {
     sequence = 0;
     store = new InMemoryInventory();
-    requireManageable = vi.fn<ShopAccess['requireManageable']>(async () => undefined);
+    requireManageable = vi.fn<ShopAccess['requireManageable']>(
+      async () => undefined,
+    );
     const shops = { requireManageable, assertSellable: vi.fn() };
     const ids = { next: () => `id-${++sequence}` };
     const clock = { now: () => start };
@@ -44,7 +53,9 @@ describe('Inventory warehouses and stock', () => {
       {
         findVariantShops: async (variantIds) =>
           variantIds.flatMap((variantId) =>
-            variantId in owners ? [{ variantId, shopId: owners[variantId] }] : [],
+            variantId in owners
+              ? [{ variantId, shopId: owners[variantId] }]
+              : [],
           ),
       },
       ids,
@@ -60,12 +71,21 @@ describe('Inventory warehouses and stock', () => {
       scope.shopId === null ? admin : seller,
     );
   const receive = (warehouseId: string, variantId = 'v1', quantity = 10) =>
-    stock.receive(shop, { warehouseId, variantId, quantity, reason: 'Initial' }, seller);
+    stock.receive(
+      shop,
+      { warehouseId, variantId, quantity, reason: 'Initial' },
+      seller,
+    );
 
   describe('warehouses', () => {
     it('creates, lists and updates with optimistic versions', async () => {
       const created = await warehouse('hn');
-      expect(created).toMatchObject({ code: 'HN', shopId: 's1', isActive: true, version: 0 });
+      expect(created).toMatchObject({
+        code: 'HN',
+        shopId: 's1',
+        isActive: true,
+        version: 0,
+      });
       expect(requireManageable).toHaveBeenCalledWith('s1', seller);
       expect(await warehouses.list(shop, seller)).toHaveLength(1);
 
@@ -75,7 +95,11 @@ describe('Inventory warehouses and stock', () => {
         { version: 0, isActive: false, priority: 5 },
         seller,
       );
-      expect(updated).toMatchObject({ isActive: false, priority: 5, version: 1 });
+      expect(updated).toMatchObject({
+        isActive: false,
+        priority: 5,
+        version: 1,
+      });
       await expect(
         warehouses.update(shop, created.id, { version: 0, name: 'x' }, seller),
       ).rejects.toThrow(InventoryStaleVersionError);
@@ -84,29 +108,46 @@ describe('Inventory warehouses and stock', () => {
     it('rejects a duplicate code within a shop but allows it in another scope', async () => {
       await warehouse('hn');
       await expect(warehouse('hn')).rejects.toThrow(InventoryConflictError);
-      await expect(warehouse('hn', platform)).resolves.toMatchObject({ shopId: null });
+      await expect(warehouse('hn', platform)).resolves.toMatchObject({
+        shopId: null,
+      });
     });
 
     it('treats another shop warehouse as missing', async () => {
       const mine = await warehouse('hn');
       await expect(
-        warehouses.update({ shopId: 's2' }, mine.id, { version: 0, name: 'x' }, seller),
+        warehouses.update(
+          { shopId: 's2' },
+          mine.id,
+          { version: 0, name: 'x' },
+          seller,
+        ),
       ).rejects.toThrow(InventoryNotFoundError);
       expect(await warehouses.list({ shopId: 's2' }, seller)).toEqual([]);
     });
 
     it('validates input', async () => {
       await expect(warehouse('')).rejects.toThrow(InventoryValidationError);
-      await expect(warehouse('bad code!')).rejects.toThrow(InventoryValidationError);
+      await expect(warehouse('bad code!')).rejects.toThrow(
+        InventoryValidationError,
+      );
       await expect(
-        warehouses.create(shop, { name: 'x', code: 'A', priority: 5000 }, seller),
+        warehouses.create(
+          shop,
+          { name: 'x', code: 'A', priority: 5000 },
+          seller,
+        ),
       ).rejects.toThrow(InventoryValidationError);
     });
 
     it('restricts the platform scope to administrators', async () => {
       await expect(warehouse('p1', platform)).resolves.toBeDefined();
       await expect(
-        warehouses.create(platform, { name: 'P', code: 'P2' }, { userId: 'u9', role: 'CUSTOMER' }),
+        warehouses.create(
+          platform,
+          { name: 'P', code: 'P2' },
+          { userId: 'u9', role: 'CUSTOMER' },
+        ),
       ).rejects.toThrow(InventoryAccessDeniedError);
       expect(
         await warehouses.create(platform, { name: 'P', code: 'P3' }, admin),
@@ -129,8 +170,13 @@ describe('Inventory warehouses and stock', () => {
         available: 10,
         version: 1,
       });
-      expect(await receive(w.id, 'v1', 5)).toMatchObject({ onHand: 15, version: 2 });
-      expect(store.movements.map((m) => [m.type, m.onHandDelta, m.actorUserId])).toEqual([
+      expect(await receive(w.id, 'v1', 5)).toMatchObject({
+        onHand: 15,
+        version: 2,
+      });
+      expect(
+        store.movements.map((m) => [m.type, m.onHandDelta, m.actorUserId]),
+      ).toEqual([
         ['RECEIPT', 10, 'u1'],
         ['RECEIPT', 5, 'u1'],
       ]);
@@ -138,16 +184,30 @@ describe('Inventory warehouses and stock', () => {
 
     it('only stocks variants owned by the warehouse scope', async () => {
       const w = await warehouse('hn');
-      await expect(receive(w.id, 'other')).rejects.toThrow(InventoryNotFoundError);
-      await expect(receive(w.id, 'plat')).rejects.toThrow(InventoryNotFoundError);
-      await expect(receive(w.id, 'missing')).rejects.toThrow(InventoryNotFoundError);
+      await expect(receive(w.id, 'other')).rejects.toThrow(
+        InventoryNotFoundError,
+      );
+      await expect(receive(w.id, 'plat')).rejects.toThrow(
+        InventoryNotFoundError,
+      );
+      await expect(receive(w.id, 'missing')).rejects.toThrow(
+        InventoryNotFoundError,
+      );
 
       const p = await warehouse('p1', platform);
       await expect(
-        stock.receive(platform, { warehouseId: p.id, variantId: 'plat', quantity: 3, reason: 'r' }, admin),
+        stock.receive(
+          platform,
+          { warehouseId: p.id, variantId: 'plat', quantity: 3, reason: 'r' },
+          admin,
+        ),
       ).resolves.toMatchObject({ onHand: 3 });
       await expect(
-        stock.receive(platform, { warehouseId: p.id, variantId: 'v1', quantity: 3, reason: 'r' }, admin),
+        stock.receive(
+          platform,
+          { warehouseId: p.id, variantId: 'v1', quantity: 3, reason: 'r' },
+          admin,
+        ),
       ).rejects.toThrow(InventoryNotFoundError);
     });
 
@@ -165,35 +225,67 @@ describe('Inventory warehouses and stock', () => {
     it('rejects invalid quantities and reasons', async () => {
       const w = await warehouse('hn');
       for (const quantity of [0, -3, 1.5, 2_000_000_000])
-        await expect(receive(w.id, 'v1', quantity)).rejects.toThrow(InventoryValidationError);
+        await expect(receive(w.id, 'v1', quantity)).rejects.toThrow(
+          InventoryValidationError,
+        );
       await expect(
-        stock.receive(shop, { warehouseId: w.id, variantId: 'v1', quantity: 1, reason: ' ' }, seller),
+        stock.receive(
+          shop,
+          { warehouseId: w.id, variantId: 'v1', quantity: 1, reason: ' ' },
+          seller,
+        ),
       ).rejects.toThrow(InventoryValidationError);
     });
 
     it('adjusts with the expected version and never below reserved units', async () => {
       const w = await warehouse('hn');
       const current = await receive(w.id, 'v1', 10);
-      store.stocks.set(current.id, { ...store.stocks.get(current.id)!, reserved: 6 });
+      store.stocks.set(current.id, {
+        ...store.stocks.get(current.id)!,
+        reserved: 6,
+      });
       const adjust = (quantityDelta: number, version: number) =>
         stock.adjust(
           shop,
-          { warehouseId: w.id, variantId: 'v1', quantityDelta, reason: 'Count', version },
+          {
+            warehouseId: w.id,
+            variantId: 'v1',
+            quantityDelta,
+            reason: 'Count',
+            version,
+          },
           seller,
         );
 
-      expect(await adjust(-4, current.version)).toMatchObject({ onHand: 6, available: 0 });
-      await expect(adjust(-1, current.version + 1)).rejects.toThrow(InsufficientStockError);
-      await expect(adjust(-1, current.version)).rejects.toThrow(InventoryStaleVersionError);
-      await expect(adjust(0, current.version + 1)).rejects.toThrow(InventoryValidationError);
+      expect(await adjust(-4, current.version)).toMatchObject({
+        onHand: 6,
+        available: 0,
+      });
+      await expect(adjust(-1, current.version + 1)).rejects.toThrow(
+        InsufficientStockError,
+      );
+      await expect(adjust(-1, current.version)).rejects.toThrow(
+        InventoryStaleVersionError,
+      );
+      await expect(adjust(0, current.version + 1)).rejects.toThrow(
+        InventoryValidationError,
+      );
       await expect(
         stock.adjust(
           shop,
-          { warehouseId: w.id, variantId: 'v2', quantityDelta: 1, reason: 'x', version: 0 },
+          {
+            warehouseId: w.id,
+            variantId: 'v2',
+            quantityDelta: 1,
+            reason: 'x',
+            version: 0,
+          },
           seller,
         ),
       ).rejects.toThrow(InventoryNotFoundError);
-      const adjustments = store.movements.filter((m) => m.type === 'ADJUSTMENT');
+      const adjustments = store.movements.filter(
+        (m) => m.type === 'ADJUSTMENT',
+      );
       expect(adjustments).toHaveLength(1);
       expect(adjustments[0].onHandDelta).toBe(-4);
     });
@@ -205,7 +297,13 @@ describe('Inventory warehouses and stock', () => {
 
       const result = await stock.transfer(
         shop,
-        { fromWarehouseId: a.id, toWarehouseId: b.id, variantId: 'v1', quantity: 4, reason: 'Rebalance' },
+        {
+          fromWarehouseId: a.id,
+          toWarehouseId: b.id,
+          variantId: 'v1',
+          quantity: 4,
+          reason: 'Rebalance',
+        },
         seller,
       );
       expect(result.from).toMatchObject({ onHand: 6 });
@@ -225,14 +323,23 @@ describe('Inventory warehouses and stock', () => {
       const a = await warehouse('a');
       const b = await warehouse('b');
       const source = await receive(a.id, 'v1', 10);
-      store.stocks.set(source.id, { ...store.stocks.get(source.id)!, reserved: 8 });
+      store.stocks.set(source.id, {
+        ...store.stocks.get(source.id)!,
+        reserved: 8,
+      });
       const before = [...store.stocks.values()];
       const movements = store.movements.length;
 
       await expect(
         stock.transfer(
           shop,
-          { fromWarehouseId: a.id, toWarehouseId: b.id, variantId: 'v1', quantity: 3, reason: 'x' },
+          {
+            fromWarehouseId: a.id,
+            toWarehouseId: b.id,
+            variantId: 'v1',
+            quantity: 3,
+            reason: 'x',
+          },
           seller,
         ),
       ).rejects.toThrow(InsufficientStockError);
@@ -246,14 +353,26 @@ describe('Inventory warehouses and stock', () => {
       await expect(
         stock.transfer(
           shop,
-          { fromWarehouseId: a.id, toWarehouseId: a.id, variantId: 'v1', quantity: 1, reason: 'x' },
+          {
+            fromWarehouseId: a.id,
+            toWarehouseId: a.id,
+            variantId: 'v1',
+            quantity: 1,
+            reason: 'x',
+          },
           seller,
         ),
       ).rejects.toThrow(InventoryValidationError);
       await expect(
         stock.transfer(
           shop,
-          { fromWarehouseId: a.id, toWarehouseId: 'nope', variantId: 'v1', quantity: 1, reason: 'x' },
+          {
+            fromWarehouseId: a.id,
+            toWarehouseId: 'nope',
+            variantId: 'v1',
+            quantity: 1,
+            reason: 'x',
+          },
           seller,
         ),
       ).rejects.toThrow(InventoryNotFoundError);
@@ -263,20 +382,36 @@ describe('Inventory warehouses and stock', () => {
       const a = await warehouse('a');
       const p = await warehouse('p', platform);
       await receive(a.id, 'v1', 3);
-      await stock.receive(platform, { warehouseId: p.id, variantId: 'plat', quantity: 9, reason: 'r' }, admin);
+      await stock.receive(
+        platform,
+        { warehouseId: p.id, variantId: 'plat', quantity: 9, reason: 'r' },
+        admin,
+      );
 
       const mine = await stock.list(shop, { page: 1, limit: 20 }, seller);
       expect(mine.items.map((s) => s.variantId)).toEqual(['v1']);
       expect(mine).toMatchObject({ total: 1, pages: 1 });
-      expect((await stock.list(platform, { page: 1, limit: 20 }, admin)).items).toHaveLength(1);
-      expect((await stock.movements(shop, { page: 1, limit: 20 }, seller)).items).toHaveLength(1);
-      expect((await stock.list(shop, { page: 1, limit: 20, variantId: 'zzz' }, seller)).items).toEqual([]);
-      await expect(stock.list(shop, { page: 0, limit: 20 }, seller)).rejects.toThrow(
-        InventoryValidationError,
-      );
-      await expect(stock.list(shop, { page: 1, limit: 101 }, seller)).rejects.toThrow(
-        InventoryValidationError,
-      );
+      expect(
+        (await stock.list(platform, { page: 1, limit: 20 }, admin)).items,
+      ).toHaveLength(1);
+      expect(
+        (await stock.movements(shop, { page: 1, limit: 20 }, seller)).items,
+      ).toHaveLength(1);
+      expect(
+        (
+          await stock.list(
+            shop,
+            { page: 1, limit: 20, variantId: 'zzz' },
+            seller,
+          )
+        ).items,
+      ).toEqual([]);
+      await expect(
+        stock.list(shop, { page: 0, limit: 20 }, seller),
+      ).rejects.toThrow(InventoryValidationError);
+      await expect(
+        stock.list(shop, { page: 1, limit: 101 }, seller),
+      ).rejects.toThrow(InventoryValidationError);
     });
   });
 
@@ -286,7 +421,10 @@ describe('Inventory warehouses and stock', () => {
       const b = await warehouse('b');
       await receive(a.id, 'v1', 2);
       await receive(b.id, 'v2', 4);
-      store.warehouses.set(b.id, { ...store.warehouses.get(b.id)!, isActive: false });
+      store.warehouses.set(b.id, {
+        ...store.warehouses.get(b.id)!,
+        isActive: false,
+      });
 
       expect(await availability.check(['v1', 'v2', 'v3', 'v1'])).toEqual([
         { variantId: 'v1', inStock: true },
@@ -299,11 +437,15 @@ describe('Inventory warehouses and stock', () => {
       const a = await warehouse('a');
       const s = await receive(a.id, 'v1', 2);
       store.stocks.set(s.id, { ...store.stocks.get(s.id)!, reserved: 2 });
-      expect(await availability.check(['v1'])).toEqual([{ variantId: 'v1', inStock: false }]);
+      expect(await availability.check(['v1'])).toEqual([
+        { variantId: 'v1', inStock: false },
+      ]);
     });
 
     it('validates the id list', async () => {
-      await expect(availability.check([])).rejects.toThrow(InventoryValidationError);
+      await expect(availability.check([])).rejects.toThrow(
+        InventoryValidationError,
+      );
       await expect(
         availability.check(Array.from({ length: 101 }, (_, i) => `v${i}`)),
       ).rejects.toThrow(InventoryValidationError);

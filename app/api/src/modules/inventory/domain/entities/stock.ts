@@ -41,7 +41,12 @@ export function createStock(input: {
   };
 }
 
-function next(stock: Stock, onHand: number, reserved: number, now: Date): Stock {
+function next(
+  stock: Stock,
+  onHand: number,
+  reserved: number,
+  now: Date,
+): Stock {
   if (onHand > MAX_STOCK_QUANTITY)
     throw new InventoryValidationError(
       `Stock on hand cannot exceed ${MAX_STOCK_QUANTITY}`,
@@ -54,7 +59,12 @@ function next(stock: Stock, onHand: number, reserved: number, now: Date): Stock 
 }
 
 export function receiveStock(stock: Stock, quantity: number, now: Date) {
-  return next(stock, stock.onHand + positiveQuantity(quantity), stock.reserved, now);
+  return next(
+    stock,
+    stock.onHand + positiveQuantity(quantity),
+    stock.reserved,
+    now,
+  );
 }
 
 export function adjustStock(stock: Stock, delta: number, now: Date) {
@@ -76,7 +86,12 @@ export function reserveStock(stock: Stock, quantity: number, now: Date) {
 }
 
 export function releaseStock(stock: Stock, quantity: number, now: Date) {
-  return next(stock, stock.onHand, stock.reserved - positiveQuantity(quantity), now);
+  return next(
+    stock,
+    stock.onHand,
+    stock.reserved - positiveQuantity(quantity),
+    now,
+  );
 }
 
 /** Shipping consumes reserved units: both on-hand and reserved decrease. */

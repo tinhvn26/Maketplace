@@ -40,7 +40,10 @@ export class PrismaWarehouseRepository implements WarehouseRepository {
     return rows.map((row) => this.toWarehouse(row));
   }
 
-  async save(warehouse: Warehouse, expectedVersion: number): Promise<Warehouse> {
+  async save(
+    warehouse: Warehouse,
+    expectedVersion: number,
+  ): Promise<Warehouse> {
     const updated = await this.db.inventoryWarehouse.updateMany({
       where: { id: warehouse.id, version: expectedVersion },
       data: {

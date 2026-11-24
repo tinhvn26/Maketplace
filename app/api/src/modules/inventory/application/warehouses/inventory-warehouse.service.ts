@@ -1,4 +1,7 @@
-import type { ShopAccess, ShopActor } from '../../../shops/contracts/shops.api.js';
+import type {
+  ShopAccess,
+  ShopActor,
+} from '../../../shops/contracts/shops.api.js';
 import {
   createWarehouse,
   updateWarehouse,

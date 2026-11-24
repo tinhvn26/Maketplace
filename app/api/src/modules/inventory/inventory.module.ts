@@ -65,7 +65,10 @@ const clock = { now: () => new Date() };
           clock,
         ),
     },
-    { provide: INVENTORY_RESERVATIONS, useExisting: InventoryReservationService },
+    {
+      provide: INVENTORY_RESERVATIONS,
+      useExisting: InventoryReservationService,
+    },
     {
       provide: InventoryAvailabilityService,
       inject: [INVENTORY_UNIT_OF_WORK],

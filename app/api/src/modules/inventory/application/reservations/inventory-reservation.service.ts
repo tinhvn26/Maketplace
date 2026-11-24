@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CatalogPricing } from '../../../catalog/contracts/catalog-pricing.api.js';
-import type {
-  InventoryReservations,
-} from '../../contracts/inventory.api.js';
+import type { InventoryReservations } from '../../contracts/inventory.api.js';
 import type {
   ReservationResult,
   ReserveStockRequest,
@@ -19,7 +17,11 @@ import type {
   Reservation,
   ReservationLine,
 } from '../../domain/entities/reservation.js';
-import { releaseStock, reserveStock, shipStock } from '../../domain/entities/stock.js';
+import {
+  releaseStock,
+  reserveStock,
+  shipStock,
+} from '../../domain/entities/stock.js';
 import { stockMovement } from '../../domain/entities/stock-movement.js';
 import type { StockMovementType } from '../../domain/entities/stock-movement.js';
 import {
@@ -58,7 +60,9 @@ export class InventoryReservationService implements InventoryReservations {
   async reserve(request: ReserveStockRequest): Promise<ReservationResult> {
     const input = this.validate(request);
     const requestHash = createHash('sha256')
-      .update(JSON.stringify({ reference: input.reference, lines: input.lines }))
+      .update(
+        JSON.stringify({ reference: input.reference, lines: input.lines }),
+      )
       .digest('hex');
 
     // A replay is answered before pricing so it survives the variant being retired later.
@@ -68,6 +72,9 @@ export class InventoryReservationService implements InventoryReservations {
     if (existing) return this.replay(existing, requestHash);
 
     // Rejects variants that are unpublished, inactive, or whose shop cannot sell.
+    // Known gap: the quote runs before the transaction, so a variant retired in
+    // between can still be held. The hold expires by TTL, and Orders must quote
+    // again at confirm time before taking payment.
     await this.pricing.quote({ lines: input.lines });
 
     return retryOnConflict(() =>
@@ -147,8 +154,17 @@ export class InventoryReservationService implements InventoryReservations {
         const now = this.clock.now();
         const { reservation, released } = releaseReservation(current, now);
         if (reservation === current) return this.toResult(current);
-        await this.giveBack(tx, released, 'RELEASE', current.id, 'Reservation released', now);
-        return this.toResult(await tx.reservations.save(reservation, current.version));
+        await this.giveBack(
+          tx,
+          released,
+          'RELEASE',
+          current.id,
+          'Reservation released',
+          now,
+        );
+        return this.toResult(
+          await tx.reservations.save(reservation, current.version),
+        );
       }),
     );
   }
@@ -169,7 +185,10 @@ export class InventoryReservationService implements InventoryReservations {
         const movements = [];
         for (const line of shipped) {
           const stock = stocks.get(line.stockId)!;
-          await tx.stocks.save(shipStock(stock, line.quantity, now), stock.version);
+          await tx.stocks.save(
+            shipStock(stock, line.quantity, now),
+            stock.version,
+          );
           movements.push(
             stockMovement({
               stockId: line.stockId,
@@ -183,7 +202,9 @@ export class InventoryReservationService implements InventoryReservations {
           );
         }
         await tx.stocks.appendMovements(movements);
-        return this.toResult(await tx.reservations.save(reservation, current.version));
+        return this.toResult(
+          await tx.reservations.save(reservation, current.version),
+        );
       }),
     );
   }
@@ -204,7 +225,14 @@ export class InventoryReservationService implements InventoryReservations {
             // Confirmed or released meanwhile: nothing left to expire.
             if (!current || !isReservationExpired(current, now)) return false;
             const { reservation, released } = expireReservation(current, now);
-            await this.giveBack(tx, released, 'EXPIRE', current.id, 'Reservation expired', now);
+            await this.giveBack(
+              tx,
+              released,
+              'EXPIRE',
+              current.id,
+              'Reservation expired',
+              now,
+            );
             await tx.reservations.save(reservation, current.version);
             return true;
           }),
@@ -221,7 +249,10 @@ export class InventoryReservationService implements InventoryReservations {
   private validate(request: ReserveStockRequest) {
     if (typeof request !== 'object' || request === null)
       throw new InventoryValidationError('A reservation request is required');
-    const idempotencyKey = inventoryId(request.idempotencyKey, 'idempotency key');
+    const idempotencyKey = inventoryId(
+      request.idempotencyKey,
+      'idempotency key',
+    );
     const reference = inventoryId(request.reference, 'reference');
     if (
       !Array.isArray(request.lines) ||
@@ -247,12 +278,19 @@ export class InventoryReservationService implements InventoryReservations {
     return { idempotencyKey, reference, lines };
   }
 
-  private replay(existing: Reservation, requestHash: string): ReservationResult {
-    if (existing.requestHash !== requestHash) throw new IdempotencyConflictError();
+  private replay(
+    existing: Reservation,
+    requestHash: string,
+  ): ReservationResult {
+    if (existing.requestHash !== requestHash)
+      throw new IdempotencyConflictError();
     return this.toResult(existing);
   }
 
-  private async load(tx: InventoryRepositories, id: string): Promise<Reservation> {
+  private async load(
+    tx: InventoryRepositories,
+    id: string,
+  ): Promise<Reservation> {
     const reservation = await tx.reservations.findById(id);
     if (!reservation) throw new InventoryNotFoundError('Reservation not found');
     return reservation;
@@ -279,7 +317,10 @@ export class InventoryReservationService implements InventoryReservations {
     const movements = [];
     for (const line of lines) {
       const stock = stocks.get(line.stockId)!;
-      await tx.stocks.save(releaseStock(stock, line.quantity, now), stock.version);
+      await tx.stocks.save(
+        releaseStock(stock, line.quantity, now),
+        stock.version,
+      );
       movements.push(
         stockMovement({
           stockId: line.stockId,

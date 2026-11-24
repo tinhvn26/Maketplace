@@ -50,7 +50,12 @@ export class PrismaReservationRepository implements ReservationRepository {
     const { lines, ...header } = reservation;
     try {
       await this.db.inventoryReservation.create({
-        data: { ...header, lines: { create: lines.map((line, position) => ({ ...line, position })) } },
+        data: {
+          ...header,
+          lines: {
+            create: lines.map((line, position) => ({ ...line, position })),
+          },
+        },
       });
     } catch (error) {
       // A duplicate key means another request won the race: the caller re-reads and replays it.
@@ -98,13 +103,24 @@ export class PrismaReservationRepository implements ReservationRepository {
     return rows.map((row) => row.id);
   }
 
-  private toReservation({ lines, status, ...row }: ReservationRow): Reservation {
+  private toReservation({
+    lines,
+    status,
+    ...row
+  }: ReservationRow): Reservation {
     if (!STATUSES.includes(status))
       throw new Error('Unsupported persisted reservation status');
     return {
       ...row,
       status: status as ReservationStatus,
-      lines: lines.map(({ id: _id, reservationId: _reservationId, position: _position, ...line }) => line),
+      lines: lines.map(
+        ({
+          id: _id,
+          reservationId: _reservationId,
+          position: _position,
+          ...line
+        }) => line,
+      ),
     };
   }
 }

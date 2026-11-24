@@ -44,9 +44,11 @@ export function isReservationExpired(reservation: Reservation, now: Date) {
   );
 }
 
-export function createReservation(input: Omit<Reservation, 'status' | 'version' | 'createdAt' | 'updatedAt'> & {
-  now: Date;
-}): Reservation {
+export function createReservation(
+  input: Omit<Reservation, 'status' | 'version' | 'createdAt' | 'updatedAt'> & {
+    now: Date;
+  },
+): Reservation {
   const { now, ...rest } = input;
   if (rest.lines.length === 0)
     throw new ReservationStateError('A reservation requires at least one line');
@@ -59,11 +61,21 @@ export function createReservation(input: Omit<Reservation, 'status' | 'version' 
   };
 }
 
-export function confirmReservation(reservation: Reservation, now: Date): Reservation {
+export function confirmReservation(
+  reservation: Reservation,
+  now: Date,
+): Reservation {
   if (reservation.status === 'ALLOCATED') return reservation;
   if (reservation.status !== 'ACTIVE' || isReservationExpired(reservation, now))
-    throw new ReservationStateError('Only an unexpired active reservation can be confirmed');
-  return { ...reservation, status: 'ALLOCATED', expiresAt: null, updatedAt: inventoryDate(now) };
+    throw new ReservationStateError(
+      'Only an unexpired active reservation can be confirmed',
+    );
+  return {
+    ...reservation,
+    status: 'ALLOCATED',
+    expiresAt: null,
+    updatedAt: inventoryDate(now),
+  };
 }
 
 export function shipReservationWarehouse(
@@ -72,12 +84,16 @@ export function shipReservationWarehouse(
   now: Date,
 ): { reservation: Reservation; shipped: ReservationLine[] } {
   if (reservation.status !== 'ALLOCATED')
-    throw new ReservationStateError('Only an allocated reservation can be shipped');
+    throw new ReservationStateError(
+      'Only an allocated reservation can be shipped',
+    );
   const shipped = reservation.lines.filter(
     (line) => line.warehouseId === warehouseId && line.shippedAt === null,
   );
   if (shipped.length === 0)
-    throw new ReservationStateError('This warehouse has nothing left to ship for the reservation');
+    throw new ReservationStateError(
+      'This warehouse has nothing left to ship for the reservation',
+    );
   const at = inventoryDate(now);
   const lines = reservation.lines.map((line) =>
     shipped.includes(line) ? { ...line, shippedAt: at } : line,
@@ -86,7 +102,9 @@ export function shipReservationWarehouse(
     reservation: {
       ...reservation,
       lines,
-      status: lines.every((line) => line.shippedAt !== null) ? 'SHIPPED' : 'ALLOCATED',
+      status: lines.every((line) => line.shippedAt !== null)
+        ? 'SHIPPED'
+        : 'ALLOCATED',
       updatedAt: at,
     },
     shipped,
@@ -100,9 +118,16 @@ export function releaseReservation(
 ): { reservation: Reservation; released: ReservationLine[] } {
   if (reservation.status === 'RELEASED') return { reservation, released: [] };
   if (reservation.status !== 'ACTIVE' && reservation.status !== 'ALLOCATED')
-    throw new ReservationStateError('Only an active or allocated reservation can be released');
+    throw new ReservationStateError(
+      'Only an active or allocated reservation can be released',
+    );
   return {
-    reservation: { ...reservation, status: 'RELEASED', expiresAt: null, updatedAt: inventoryDate(now) },
+    reservation: {
+      ...reservation,
+      status: 'RELEASED',
+      expiresAt: null,
+      updatedAt: inventoryDate(now),
+    },
     released: heldLines(reservation),
   };
 }
@@ -114,7 +139,11 @@ export function expireReservation(
   if (!isReservationExpired(reservation, now))
     throw new ReservationStateError('Reservation has not expired');
   return {
-    reservation: { ...reservation, status: 'EXPIRED', updatedAt: inventoryDate(now) },
+    reservation: {
+      ...reservation,
+      status: 'EXPIRED',
+      updatedAt: inventoryDate(now),
+    },
     released: heldLines(reservation),
   };
 }

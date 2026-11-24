@@ -9,7 +9,10 @@ export async function retryOnConflict<T>(
     try {
       return await operation();
     } catch (error) {
-      if (!(error instanceof InventoryVersionConflictError) || attempt >= attempts)
+      if (
+        !(error instanceof InventoryVersionConflictError) ||
+        attempt >= attempts
+      )
         throw error;
     }
   }

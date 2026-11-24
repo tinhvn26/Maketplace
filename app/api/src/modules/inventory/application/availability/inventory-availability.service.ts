@@ -20,8 +20,12 @@ export class InventoryAvailabilityService {
       throw new InventoryValidationError(
         `At most ${MAX_VARIANTS} variants can be checked at once`,
       );
-    const rows = await this.unitOfWork.read((tx) => tx.stocks.availability(ids));
-    const available = new Map(rows.map((row) => [row.variantId, row.available]));
+    const rows = await this.unitOfWork.read((tx) =>
+      tx.stocks.availability(ids),
+    );
+    const available = new Map(
+      rows.map((row) => [row.variantId, row.available]),
+    );
     return ids.map((variantId) => ({
       variantId,
       inStock: (available.get(variantId) ?? 0) > 0,

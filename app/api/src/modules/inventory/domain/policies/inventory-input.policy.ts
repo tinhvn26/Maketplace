@@ -9,7 +9,11 @@ export function inventoryId(value: unknown, label = 'identifier'): string {
 }
 
 export function positiveQuantity(value: unknown, max = MAX_STOCK_QUANTITY) {
-  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > max)
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 1 ||
+    (value as number) > max
+  )
     throw new InventoryValidationError(
       `Quantity must be an integer from 1 to ${max}`,
     );

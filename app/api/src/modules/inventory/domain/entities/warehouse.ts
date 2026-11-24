@@ -1,5 +1,8 @@
 import { InventoryValidationError } from '../errors/inventory.errors.js';
-import { inventoryDate, inventoryId } from '../policies/inventory-input.policy.js';
+import {
+  inventoryDate,
+  inventoryId,
+} from '../policies/inventory-input.policy.js';
 
 export interface Warehouse {
   id: string;
@@ -28,7 +31,8 @@ function name(value: unknown): string {
 }
 
 function code(value: unknown): string {
-  const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
+  const normalized =
+    typeof value === 'string' ? value.trim().toUpperCase() : '';
   if (!/^[A-Z0-9][A-Z0-9_-]{0,31}$/.test(normalized))
     throw new InventoryValidationError(
       'Warehouse code must be 1 to 32 letters, digits, hyphens or underscores',
@@ -37,7 +41,11 @@ function code(value: unknown): string {
 }
 
 function priority(value: unknown): number {
-  if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 1000)
+  if (
+    !Number.isInteger(value) ||
+    (value as number) < 0 ||
+    (value as number) > 1000
+  )
     throw new InventoryValidationError(
       'Warehouse priority must be an integer from 0 to 1000',
     );
@@ -54,7 +62,10 @@ export function createWarehouse(input: {
 }): Warehouse {
   return {
     id: inventoryId(input.id, 'warehouse identifier'),
-    shopId: input.shopId === null ? null : inventoryId(input.shopId, 'shop identifier'),
+    shopId:
+      input.shopId === null
+        ? null
+        : inventoryId(input.shopId, 'shop identifier'),
     name: name(input.name),
     code: code(input.code),
     priority: priority(input.priority ?? 100),
@@ -86,7 +97,9 @@ export function updateWarehouse(
     ...warehouse,
     name: changes.name === undefined ? warehouse.name : name(changes.name),
     priority:
-      changes.priority === undefined ? warehouse.priority : priority(changes.priority),
+      changes.priority === undefined
+        ? warehouse.priority
+        : priority(changes.priority),
     isActive: changes.isActive ?? warehouse.isActive,
     updatedAt: inventoryDate(now),
   };

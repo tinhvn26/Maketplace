@@ -25,7 +25,10 @@ describe('InventoryReservationService', () => {
     now = new Date(start);
     sequence = 0;
     store = new InMemoryInventory();
-    for (const [id, priority] of [['wa', 1], ['wb', 2]] as const)
+    for (const [id, priority] of [
+      ['wa', 1],
+      ['wb', 2],
+    ] as const)
       store.warehouses.set(id, {
         id,
         shopId: 's1',
@@ -37,7 +40,10 @@ describe('InventoryReservationService', () => {
         createdAt: start,
         updatedAt: start,
       });
-    for (const [warehouseId, onHand] of [['wa', 5], ['wb', 4]] as const)
+    for (const [warehouseId, onHand] of [
+      ['wa', 5],
+      ['wb', 4],
+    ] as const)
       store.stocks.set(`stock-${warehouseId}`, {
         id: `stock-${warehouseId}`,
         warehouseId,
@@ -102,8 +108,13 @@ describe('InventoryReservationService', () => {
   });
 
   it('skips inactive warehouses', async () => {
-    store.warehouses.set('wa', { ...store.warehouses.get('wa')!, isActive: false });
-    expect((await reserve(2)).allocations.map((a) => a.warehouseId)).toEqual(['wb']);
+    store.warehouses.set('wa', {
+      ...store.warehouses.get('wa')!,
+      isActive: false,
+    });
+    expect((await reserve(2)).allocations.map((a) => a.warehouseId)).toEqual([
+      'wb',
+    ]);
     await expect(reserve(3, 'order-2')).rejects.toThrow(InsufficientStockError);
   });
 
@@ -159,8 +170,12 @@ describe('InventoryReservationService', () => {
     const { reservationId } = await reserve(2);
     await service.confirm(reservationId);
     await service.ship(reservationId, 'wa');
-    await expect(service.release(reservationId)).rejects.toThrow(ReservationStateError);
-    await expect(service.confirm('missing')).rejects.toThrow(InventoryNotFoundError);
+    await expect(service.release(reservationId)).rejects.toThrow(
+      ReservationStateError,
+    );
+    await expect(service.confirm('missing')).rejects.toThrow(
+      InventoryNotFoundError,
+    );
   });
 
   it('expires unconfirmed holds past their TTL and leaves confirmed ones', async () => {
@@ -173,7 +188,9 @@ describe('InventoryReservationService', () => {
     expect(await service.expireDue()).toBe(1);
 
     expect(store.reservations.get(stale.reservationId)!.status).toBe('EXPIRED');
-    expect(store.reservations.get(confirmed.reservationId)!.status).toBe('ALLOCATED');
+    expect(store.reservations.get(confirmed.reservationId)!.status).toBe(
+      'ALLOCATED',
+    );
     expect(stockOf('wa').reserved).toBe(1);
     expect(store.movements.filter((m) => m.type === 'EXPIRE')).toHaveLength(1);
     expect(await service.expireDue()).toBe(0);
@@ -192,7 +209,10 @@ describe('InventoryReservationService', () => {
 
   it('gives up after repeated conflicts without leaving partial holds', async () => {
     store.beforeStockSave = () =>
-      store.stocks.set('stock-wa', { ...stockOf('wa'), version: stockOf('wa').version + 1 });
+      store.stocks.set('stock-wa', {
+        ...stockOf('wa'),
+        version: stockOf('wa').version + 1,
+      });
     await expect(reserve(2)).rejects.toThrow(InventoryVersionConflictError);
     expect(store.reservations.size).toBe(0);
     expect(store.movements).toHaveLength(0);

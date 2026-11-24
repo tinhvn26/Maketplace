@@ -28,8 +28,18 @@ export interface StockMovementRecord extends StockMovement {
 }
 
 export function stockMovement(
-  input: Pick<StockMovement, 'stockId' | 'type' | 'onHandDelta' | 'reservedDelta' | 'reason' | 'createdAt'> &
-    Partial<Pick<StockMovement, 'actorUserId' | 'reservationId' | 'transferId'>>,
+  input: Pick<
+    StockMovement,
+    | 'stockId'
+    | 'type'
+    | 'onHandDelta'
+    | 'reservedDelta'
+    | 'reason'
+    | 'createdAt'
+  > &
+    Partial<
+      Pick<StockMovement, 'actorUserId' | 'reservationId' | 'transferId'>
+    >,
 ): StockMovement {
   return {
     actorUserId: null,

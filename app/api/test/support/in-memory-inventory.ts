@@ -45,7 +45,8 @@ export class InMemoryInventory implements InventoryUnitOfWork {
 
   // `state` defaults to this so the object literals below can refer to it without an alias.
   private repositories(state: InMemoryInventory = this): InventoryRepositories {
-    const scoped = (shopId: string | null, warehouseId?: string, variantId?: string) =>
+    const scoped =
+      (shopId: string | null, warehouseId?: string, variantId?: string) =>
       (stock: Stock) =>
         state.warehouses.get(stock.warehouseId)?.shopId === shopId &&
         (warehouseId === undefined || stock.warehouseId === warehouseId) &&
@@ -59,7 +60,10 @@ export class InMemoryInventory implements InventoryUnitOfWork {
       warehouses: {
         async insert(warehouse) {
           for (const other of state.warehouses.values())
-            if (other.shopId === warehouse.shopId && other.code === warehouse.code)
+            if (
+              other.shopId === warehouse.shopId &&
+              other.code === warehouse.code
+            )
               throw new InventoryConflictError('Warehouse code already exists');
           state.warehouses.set(warehouse.id, warehouse);
         },
@@ -67,7 +71,9 @@ export class InMemoryInventory implements InventoryUnitOfWork {
           return state.warehouses.get(id) ?? null;
         },
         async listByShop(shopId) {
-          return [...state.warehouses.values()].filter((w) => w.shopId === shopId);
+          return [...state.warehouses.values()].filter(
+            (w) => w.shopId === shopId,
+          );
         },
         async save(warehouse, expectedVersion) {
           if (state.warehouses.get(warehouse.id)?.version !== expectedVersion)
@@ -90,7 +96,9 @@ export class InMemoryInventory implements InventoryUnitOfWork {
         },
         async insert(stock) {
           const exists = [...state.stocks.values()].some(
-            (s) => s.warehouseId === stock.warehouseId && s.variantId === stock.variantId,
+            (s) =>
+              s.warehouseId === stock.warehouseId &&
+              s.variantId === stock.variantId,
           );
           if (exists) throw new InventoryVersionConflictError();
           state.stocks.set(stock.id, stock);
@@ -122,7 +130,9 @@ export class InMemoryInventory implements InventoryUnitOfWork {
         },
         async list(f) {
           return page(
-            [...state.stocks.values()].filter(scoped(f.shopId, f.warehouseId, f.variantId)),
+            [...state.stocks.values()].filter(
+              scoped(f.shopId, f.warehouseId, f.variantId),
+            ),
             f.page,
             f.limit,
           );
@@ -158,10 +168,15 @@ export class InMemoryInventory implements InventoryUnitOfWork {
               continue;
             totals.set(
               stock.variantId,
-              (totals.get(stock.variantId) ?? 0) + stock.onHand - stock.reserved,
+              (totals.get(stock.variantId) ?? 0) +
+                stock.onHand -
+                stock.reserved,
             );
           }
-          return [...totals].map(([variantId, available]) => ({ variantId, available }));
+          return [...totals].map(([variantId, available]) => ({
+            variantId,
+            available,
+          }));
         },
       },
       reservations: {
@@ -170,7 +185,9 @@ export class InMemoryInventory implements InventoryUnitOfWork {
         },
         async findByIdempotencyKey(key) {
           return (
-            [...state.reservations.values()].find((r) => r.idempotencyKey === key) ?? null
+            [...state.reservations.values()].find(
+              (r) => r.idempotencyKey === key,
+            ) ?? null
           );
         },
         async insert(reservation) {
@@ -181,7 +198,9 @@ export class InMemoryInventory implements InventoryUnitOfWork {
           state.reservations.set(reservation.id, reservation);
         },
         async save(reservation, expectedVersion) {
-          if (state.reservations.get(reservation.id)?.version !== expectedVersion)
+          if (
+            state.reservations.get(reservation.id)?.version !== expectedVersion
+          )
             throw new InventoryVersionConflictError();
           const saved = { ...reservation, version: expectedVersion + 1 };
           state.reservations.set(saved.id, saved);

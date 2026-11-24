@@ -1,5 +1,8 @@
 import type { CatalogVariants } from '../../../catalog/contracts/catalog-variants.api.js';
-import type { ShopAccess, ShopActor } from '../../../shops/contracts/shops.api.js';
+import type {
+  ShopAccess,
+  ShopActor,
+} from '../../../shops/contracts/shops.api.js';
 import {
   adjustStock,
   createStock,

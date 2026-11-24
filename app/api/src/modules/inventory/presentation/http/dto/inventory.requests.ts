@@ -85,14 +85,20 @@ class StockChangeRequest {
 export class ReceiveStockRequest extends StockChangeRequest {
   @IsInt({ message: 'quantity phải là số nguyên.' })
   @Min(1, { message: 'quantity phải lớn hơn hoặc bằng $constraint1.' })
-  @Max(MAX_QUANTITY, { message: 'quantity phải nhỏ hơn hoặc bằng $constraint1.' })
+  @Max(MAX_QUANTITY, {
+    message: 'quantity phải nhỏ hơn hoặc bằng $constraint1.',
+  })
   quantity!: number;
 }
 
 export class AdjustStockRequest extends StockChangeRequest {
   @IsInt({ message: 'quantityDelta phải là số nguyên.' })
-  @Min(-MAX_QUANTITY, { message: 'quantityDelta phải lớn hơn hoặc bằng $constraint1.' })
-  @Max(MAX_QUANTITY, { message: 'quantityDelta phải nhỏ hơn hoặc bằng $constraint1.' })
+  @Min(-MAX_QUANTITY, {
+    message: 'quantityDelta phải lớn hơn hoặc bằng $constraint1.',
+  })
+  @Max(MAX_QUANTITY, {
+    message: 'quantityDelta phải nhỏ hơn hoặc bằng $constraint1.',
+  })
   quantityDelta!: number;
 
   @IsInt({ message: 'version phải là số nguyên.' })
@@ -113,7 +119,9 @@ export class TransferStockRequest {
 
   @IsInt({ message: 'quantity phải là số nguyên.' })
   @Min(1, { message: 'quantity phải lớn hơn hoặc bằng $constraint1.' })
-  @Max(MAX_QUANTITY, { message: 'quantity phải nhỏ hơn hoặc bằng $constraint1.' })
+  @Max(MAX_QUANTITY, {
+    message: 'quantity phải nhỏ hơn hoặc bằng $constraint1.',
+  })
   quantity!: number;
 
   @Transform(trim)
@@ -157,7 +165,12 @@ export class AvailabilityQuery {
   )
   @IsArray({ message: 'variantIds phải là danh sách ngăn cách bằng dấu phẩy.' })
   @ArrayMinSize(1, { message: 'variantIds cần ít nhất $constraint1 phần tử.' })
-  @ArrayMaxSize(100, { message: 'variantIds chỉ được tối đa $constraint1 phần tử.' })
-  @IsUUID('4', { each: true, message: 'Mỗi variantId phải là UUID phiên bản 4 hợp lệ.' })
+  @ArrayMaxSize(100, {
+    message: 'variantIds chỉ được tối đa $constraint1 phần tử.',
+  })
+  @IsUUID('4', {
+    each: true,
+    message: 'Mỗi variantId phải là UUID phiên bản 4 hợp lệ.',
+  })
   variantIds!: string[];
 }
