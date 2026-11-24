@@ -11,6 +11,7 @@ export class ReservationExpiryWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ReservationExpiryWorker.name);
   private timer?: ReturnType<typeof setInterval>;
   private running?: Promise<void>;
+  private stopping = false;
 
   constructor(
     @Inject(INVENTORY_RESERVATIONS)
@@ -20,20 +21,24 @@ export class ReservationExpiryWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => {
-      void this.sweep().catch(() => {
-        this.logger.error('Reservation expiry sweep failed');
-      });
-    }, this.config.expirySweepMs);
+    const tick = () => {
+      void this.sweep().catch((error: unknown) =>
+        this.logFailure('Reservation expiry sweep failed', error),
+      );
+    };
+    // Release stock held while the process was down without waiting a full interval.
+    tick();
+    this.timer = setInterval(tick, this.config.expirySweepMs);
     this.timer.unref();
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     try {
       await this.running;
-    } catch {
-      this.logger.error('Reservation expiry sweep failed during shutdown');
+    } catch (error) {
+      this.logFailure('Reservation expiry sweep failed during shutdown', error);
     }
   }
 
@@ -47,10 +52,20 @@ export class ReservationExpiryWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async expireAll(): Promise<void> {
-    // A full batch means more may be waiting: keep going until the backlog is drained.
-    for (;;) {
-      const expired = await this.reservations.expireDue(100);
-      if (expired < 100) return;
+    // Skipped (conflicting) ids make a batch look partial, so stop only when a batch expires nothing.
+    while (!this.stopping) {
+      if ((await this.reservations.expireDue()) === 0) return;
     }
+  }
+
+  // Error messages (Prisma ones especially) can carry query arguments, so log only name and code.
+  private logFailure(message: string, error: unknown): void {
+    if (!(error instanceof Error)) {
+      this.logger.error(`${message}: non-Error thrown`);
+      return;
+    }
+    const { code } = error as { code?: unknown };
+    const suffix = typeof code === 'string' ? ` (${code})` : '';
+    this.logger.error(`${message}: ${error.name}${suffix}`);
   }
 }
