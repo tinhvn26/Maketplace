@@ -12,7 +12,7 @@ Dự án cá nhân, tập trung vào **kiến trúc backend và tính đúng c�
 | **Shops** | Mở shop, kiểm tra quyền chủ shop, admin tạm khoá shop |
 | **Catalog** | Danh mục dạng cây, thương hiệu, sản phẩm và biến thể (SKU, giá VND, thuộc tính), luồng người bán gửi duyệt và admin duyệt, lịch sử thay đổi, tìm kiếm tiếng Việt, phân trang bằng cursor, báo giá |
 | **Media** | Upload ảnh PNG/JPEG/WebP, kiểm tra nội dung ảnh thật, tạo thumbnail, chặn xoá ảnh đang được sản phẩm dùng |
-| **Inventory** | Nhiều kho cho mỗi shop, nhập, điều chỉnh, chuyển kho kèm sổ biến động; giữ hàng có hạn (TTL), tự tách một đơn ra nhiều kho, xác nhận, xuất theo từng kho, huỷ; worker tự giải phóng hàng giữ quá hạn |
+| **Inventory** | Qua HTTP: nhiều kho cho mỗi shop, nhập, điều chỉnh, chuyển kho kèm sổ biến động, xem còn/hết hàng. Contract `INVENTORY_RESERVATIONS` (chưa có endpoint, dành cho module Orders sắp làm): giữ hàng có hạn (TTL), tự tách một đơn ra nhiều kho, xác nhận, xuất theo từng kho, huỷ. Worker tự giải phóng hàng giữ quá hạn |
 
 Chưa làm: Cart, Orders, Payment, Notifications và giao diện web (`app/web` mới là khung Next.js).
 

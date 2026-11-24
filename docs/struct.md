@@ -24,6 +24,8 @@ Marketplate/
 ```text
 identity/
 ├── contracts/identity.http.ts        # AccessTokenGuard, AdminRoleGuard, AuthenticatedRequest
+├── contracts/identity.roles.ts       # USER_ROLES, UserRole, isUserRole
+├── contracts/identity.persistence.ts # findActiveAccount, lockAccount cho adapter module khác
 ├── domain/
 │   ├── entities/user.ts              # Interface User + isUserActive/isUserDeleted
 │   ├── errors/                       # auth, users, account-actions
@@ -56,9 +58,10 @@ identity/
 ```text
 shops/
 ├── contracts/shops.api.ts            # SHOP_ACCESS: requireManageable, assertSellable; ShopActor; lỗi
+├── contracts/shops.persistence.ts    # findShopState, sellableShopWhere/-IdsSql cho adapter module khác
 ├── domain/                           # entities/shop.ts, errors/, policies/shop-access.policy.ts
-├── application/                      # shops.service.ts, ports/shop.repository.ts
-├── infrastructure/persistence/       # prisma-shop.repository.ts (cũng hiện thực SHOP_ACCESS)
+├── application/                      # shops.service.ts (luật phân quyền, hiện thực SHOP_ACCESS), ports/shop.repository.ts
+├── infrastructure/persistence/       # prisma-shop.repository.ts (chỉ đọc/ghi + transaction), shop.persistence.ts
 └── presentation/http/                # shops, admin-shops controller; dto, guard, decorator, filter
 ```
 
@@ -82,8 +85,9 @@ catalog/
 │   ├── shared/                       # Input dùng chung, CatalogPage, policy query/version
 │   └── ports/                        # catalog, seller, taxonomy, workflow repository; purchasing reader; actor; runtime
 ├── infrastructure/
-│   ├── persistence/                  # prisma-catalog, -catalog-workflow repository; prisma-catalog-purchasing.reader
-│   └── integrations/catalog-integrity.ts   # Kiểm tra actor/shop và MediaUsage trong cùng transaction
+│   ├── persistence/                  # prisma-category, -brand, -product repository (prisma-catalog là facade gộp port);
+│   │                                 # catalog-persistence.shared (mapper, retry); -catalog-workflow; -catalog-purchasing.reader
+│   └── integrations/catalog-integrity.ts   # Kiểm tra actor/shop và MediaUsage qua contracts/*.persistence.ts, trong cùng transaction
 └── presentation/http/                # controllers (public, discovery, quote, seller, admin, brands, review),
                                       # dto, filter, guards, middleware (thuộc tính), catalog-actor
 ```
@@ -93,6 +97,7 @@ catalog/
 ```text
 media/
 ├── contracts/media.api.ts            # MEDIA_ASSETS: resolveForShop; lỗi
+├── contracts/media.persistence.ts    # bindMediaUsages, releaseMediaUsages cho adapter module khác
 ├── domain/                           # entities/media-asset.ts, errors/
 ├── application/                      # media.service.ts, ports/media.ports.ts
 ├── infrastructure/

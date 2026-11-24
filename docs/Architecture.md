@@ -50,11 +50,17 @@ Mỗi module có các thư mục `contracts/ domain/ application/ infrastructure
 | Contract | Module cung cấp | Dùng để |
 |---|---|---|
 | `identity.http.ts` | Identity | `AccessTokenGuard`, `AdminRoleGuard`, `AuthenticatedRequest` |
+| `identity.roles.ts` | Identity | `USER_ROLES`, `UserRole`, `isUserRole`: danh sách role duy nhất, không viết tay ở module khác |
+| `identity.persistence.ts` | Identity | `findActiveAccount`, `lockAccount`, `activeAccountWhere`: kiểm tra tài khoản trong transaction của module khác |
+| `shops.persistence.ts` | Shops | `findShopState`, `sellableShopWhere`, `sellableShopIdsSql`: kiểm tra shop trong transaction, lọc shop còn bán |
+| `media.persistence.ts` | Media | `bindMediaUsages`, `releaseMediaUsages`: ghi ảnh đang được dùng trong transaction của module khác |
 | `SHOP_ACCESS` | Shops | `requireManageable`, `assertSellable` |
 | `MEDIA_ASSETS` | Media | `resolveForShop`: kiểm tra quyền, lấy URL chuẩn của ảnh theo `assetId` |
 | `CATALOG_PRICING` | Catalog | Báo giá hiện tại theo variant |
 | `CATALOG_VARIANTS` | Catalog | Cho biết variant thuộc shop nào |
 | `INVENTORY_RESERVATIONS` | Inventory | Giữ, xác nhận, xuất, huỷ hàng |
+
+Các file `contracts/*.persistence.ts` chỉ dành cho tầng `infrastructure/` của module khác, vì chúng nhận `Prisma.TransactionClient`. Nhờ đó Catalog và Media không đọc thẳng bảng `User`, `Shop`, `MediaAsset`, `MediaUsage`: module sở hữu bảng viết truy vấn và luật, module gọi chỉ truyền transaction của mình vào.
 
 Không được có phụ thuộc vòng. Inventory phụ thuộc Catalog và Shops, nên Catalog không import Inventory; trạng thái còn/hết hàng vì vậy là một endpoint riêng của Inventory.
 
@@ -65,6 +71,15 @@ Không được có phụ thuộc vòng. Inventory phụ thuộc Catalog và Sho
 - **Media:** file ảnh và việc ảnh đang được dùng ở đâu.
 - **Inventory:** nguồn sự thật duy nhất cho số lượng tồn.
 - **Chưa làm:** Cart (snapshot tạm, giá xác nhận lại khi đặt), Orders (vòng đời đơn, snapshot giá/địa chỉ), Payment (payment intent, webhook, đối soát; SDK của nhà cung cấp không lọt vào Orders), Notifications (gửi theo sự kiện, không đổi trạng thái đơn).
+
+### Phong cách domain
+
+Domain có hai cách viết, mỗi module chọn một và giữ nhất quán:
+
+- **Hàm thuần trên dữ liệu bất biến** (Inventory, Shops: `reserveStock(stock, qty, now)` trả về bản ghi mới). Dùng khi aggregate là bản ghi số liệu có bất biến chặt (`0 ≤ reserved ≤ onHand`) và service cần so sánh trạng thái cũ/mới để ghi compare-and-set và sổ biến động. Đây là cách mặc định cho module mới.
+- **Class có method** (Catalog: `Product.publish()`). Dùng khi aggregate có máy trạng thái nhiều bước và nhiều quy tắc gắn vào hành vi. Catalog giữ cách này vì đã viết như vậy; không chuyển đổi chỉ để thống nhất.
+
+Cả hai đều không import framework, không giữ tham chiếu tới repository, và repository chỉ nhận/trả snapshot.
 
 ## 3. Wiring
 
@@ -104,7 +119,7 @@ lỗi ở bất kỳ bước nào -> exception filter của module
   - Version cũ do client gửi trả về 409. Thua race (ghi đồng thời) ở Inventory thì service retry cả unit of work tối đa 3 lần.
 - **Transaction:**
   - Aggregate cùng các bảng phụ (audit, `MediaUsage`, lịch sử tồn kho) commit cùng nhau.
-  - Thao tác chạm tới nhiều module được điều phối ở adapter tích hợp, dưới một transaction của monolith (ví dụ `catalog-integrity.ts`). Không gọi HTTP nội bộ.
+  - Thao tác chạm tới nhiều module được điều phối ở adapter tích hợp, dưới một transaction của monolith (ví dụ `catalog-integrity.ts` gọi `contracts/*.persistence.ts` của Identity, Shops, Media). Không gọi HTTP nội bộ.
   - Inventory dùng port `InventoryUnitOfWork.run()`. Adapter chiếm write lock của SQLite ngay đầu transaction để các writer xếp hàng.
 - **SQLite busy:** adapter tự thử lại khi gặp `SQLITE_BUSY`/`SQLITE_LOCKED`.
 - **Lớp chặn cuối:** unique constraint, FK và `CHECK` trong database, ví dụ `0 ≤ reserved ≤ onHand`.
