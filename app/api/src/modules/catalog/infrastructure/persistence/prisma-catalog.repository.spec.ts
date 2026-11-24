@@ -39,6 +39,10 @@ describe('PrismaCatalogRepository with SQLite', () => {
     search: string;
   };
   const now = new Date('2026-10-27T03:00:00.000Z');
+  const CONTEXT = {
+    actor: { userId: 'admin', role: 'ADMIN' as const },
+    action: 'TEST',
+  };
 
   function variant(
     id: string,
@@ -161,13 +165,25 @@ describe('PrismaCatalogRepository with SQLite', () => {
     await prisma.mediaAsset.deleteMany();
     await prisma.shop.deleteMany();
     await prisma.user.deleteMany();
-    category = await repository.createCategory({
-      id: 'category-one',
-      name: 'Coffee',
-      slug: 'coffee',
-      version: 0,
-      createdAt: now,
+    await prisma.user.create({
+      data: {
+        id: 'admin',
+        fullName: 'Admin',
+        emailNormalized: 'admin@example.com',
+        passwordHash: 'hash',
+        role: 'ADMIN',
+      },
     });
+    category = await repository.createCategory(
+      {
+        id: 'category-one',
+        name: 'Coffee',
+        slug: 'coffee',
+        version: 0,
+        createdAt: now,
+      },
+      CONTEXT,
+    );
   });
 
   afterAll(async () => {
@@ -199,19 +215,24 @@ describe('PrismaCatalogRepository with SQLite', () => {
   });
 
   it('prevents category cycles under concurrent reparenting and refuses to delete a parent', async () => {
-    const other = await repository.createCategory({
-      ...category,
-      id: 'other-parent',
-      slug: 'other-parent',
-    });
+    const other = await repository.createCategory(
+      {
+        ...category,
+        id: 'other-parent',
+        slug: 'other-parent',
+      },
+      CONTEXT,
+    );
     const results = await Promise.allSettled([
       repository.saveCategory(
         { ...category, parentId: other.id },
         category.version,
+        CONTEXT,
       ),
       repository.saveCategory(
         { ...other, parentId: category.id },
         other.version,
+        CONTEXT,
       ),
     ]);
     expect(results.filter((row) => row.status === 'fulfilled')).toHaveLength(1);
@@ -222,7 +243,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       nodes.some((child) => child.parentId === node.id),
     )!;
     await expect(
-      repository.deleteCategory(parent.id, parent.version),
+      repository.deleteCategory(parent.id, parent.version, CONTEXT),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     expect(nodes.filter((node) => node.parentId !== null)).toHaveLength(1);
   });
@@ -232,6 +253,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('enum-product', {
         variants: [variant('enum-sku', { attributes: { size: 'M' } })],
       }),
+      CONTEXT,
     );
     const defined = await repository.saveCategory(
       {
@@ -241,6 +263,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         ],
       },
       category.version,
+      CONTEXT,
     );
     await expect(
       repository.saveCategory(
@@ -251,6 +274,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           ],
         },
         defined.version,
+        CONTEXT,
       ),
     ).rejects.toThrow();
     expect(
@@ -263,38 +287,45 @@ describe('PrismaCatalogRepository with SQLite', () => {
             variant('invalid-enum-sku', { attributes: { size: 'L' } }),
           ],
         }),
+        CONTEXT,
       ),
     ).rejects.toThrow();
     expect(await repository.findProductById('invalid-enum')).toBeNull();
   });
 
   it('provides brand CAS and prevents deletion while any product references the brand', async () => {
-    const brand = await repository.createBrand({
-      id: 'brand',
-      name: 'Maker',
-      slug: 'maker',
-      version: 0,
-      createdAt: now,
-    });
+    const brand = await repository.createBrand(
+      {
+        id: 'brand',
+        name: 'Maker',
+        slug: 'maker',
+        version: 0,
+        createdAt: now,
+      },
+      CONTEXT,
+    );
     const changed = await repository.saveBrand(
       { ...brand, name: 'Updated Maker' },
       0,
+      CONTEXT,
     );
     expect(changed.version).toBe(1);
-    await expect(repository.saveBrand(brand, 0)).rejects.toBeInstanceOf(
-      CatalogVersionConflictError,
-    );
+    await expect(
+      repository.saveBrand(brand, 0, CONTEXT),
+    ).rejects.toBeInstanceOf(CatalogVersionConflictError);
     const existing = await repository.createProduct(
       product('brand-product', { brandId: brand.id }),
+      CONTEXT,
     );
     await expect(
-      repository.deleteBrand(brand.id, changed.version),
+      repository.deleteBrand(brand.id, changed.version, CONTEXT),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     await repository.saveProduct(
       { ...existing, brandId: null },
       existing.version,
+      CONTEXT,
     );
-    await repository.deleteBrand(brand.id, changed.version);
+    await repository.deleteBrand(brand.id, changed.version, CONTEXT);
     expect(await repository.findBrandById(brand.id)).toBeNull();
   });
 
@@ -309,6 +340,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           variant('blue-medium', { attributes: { color: 'blue', size: 'M' } }),
         ],
       }),
+      CONTEXT,
     );
     await repository.createProduct(
       product('red-medium', {
@@ -325,6 +357,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           }),
         ],
       }),
+      CONTEXT,
     );
     const query = { page: 1, limit: 20, q: 'CA PHE DAC BIET' };
     expect((await repository.listPublishedProducts(query)).total).toBe(2);
@@ -369,6 +402,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           publishedAt: now,
           variants: [variant('cursor-variant-' + id)],
         }),
+        CONTEXT,
       );
     const first = await repository.browsePublishedProducts({ limit: 2 });
     expect(first.items.map((row) => row.id)).toEqual(['cursor-e', 'cursor-d']);
@@ -381,6 +415,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         publishedAt: now,
         variants: [variant('cursor-new-variant')],
       }),
+      CONTEXT,
     );
     const second = await repository.browsePublishedProducts({
       limit: 2,
@@ -407,6 +442,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('delta-product', {
         variants: [variant('delta-a'), variant('delta-b')],
       }),
+      CONTEXT,
     );
     await prisma.$executeRawUnsafe(
       'CREATE TABLE "_CatalogWriteProbe" ("variantId" TEXT NOT NULL)',
@@ -418,6 +454,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       const renamed = await repository.saveProduct(
         { ...before, name: 'Only the name changed' },
         before.version,
+        CONTEXT,
       );
       expect(
         await prisma.$queryRawUnsafe('SELECT * FROM "_CatalogWriteProbe"'),
@@ -430,6 +467,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           ),
         },
         renamed.version,
+        CONTEXT,
       );
       expect(
         await prisma.$queryRawUnsafe('SELECT * FROM "_CatalogWriteProbe"'),
@@ -499,6 +537,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         publishedAt: now,
         variants: [variant('seller-live-variant')],
       }),
+      CONTEXT,
     );
     await expect(
       repository.saveProduct(
@@ -534,6 +573,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         publishedAt: now,
         variants: [variant('shop-published-variant')],
       }),
+      CONTEXT,
     );
     expect(
       (
@@ -570,14 +610,20 @@ describe('PrismaCatalogRepository with SQLite', () => {
   });
 
   it('persists empty draft aggregates and lists categories in name order', async () => {
-    const another = await repository.createCategory({
-      id: 'category-two',
-      name: 'Bakery',
-      slug: 'bakery',
-      version: 0,
-      createdAt: now,
-    });
-    const saved = await repository.createProduct(product('new-product'));
+    const another = await repository.createCategory(
+      {
+        id: 'category-two',
+        name: 'Bakery',
+        slug: 'bakery',
+        version: 0,
+        createdAt: now,
+      },
+      CONTEXT,
+    );
+    const saved = await repository.createProduct(
+      product('new-product'),
+      CONTEXT,
+    );
     expect(saved).toEqual(product('new-product'));
     expect(await repository.findProductById(saved.id)).toEqual(saved);
     expect(await repository.findCategoryById(category.id)).toEqual(category);
@@ -586,14 +632,16 @@ describe('PrismaCatalogRepository with SQLite', () => {
 
   it('maps category and product slug uniqueness to catalog conflicts', async () => {
     await expect(
-      repository.createCategory({ ...category, id: 'other-category' }),
+      repository.createCategory({ ...category, id: 'other-category' }, CONTEXT),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     await repository.createProduct(
       product('first-product', { slug: 'unique-slug' }),
+      CONTEXT,
     );
     await expect(
       repository.createProduct(
         product('second-product', { slug: 'unique-slug' }),
+        CONTEXT,
       ),
     ).rejects.toBeInstanceOf(CatalogConflictError);
   });
@@ -607,6 +655,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         createdAt: new Date(0),
       },
       category.version,
+      CONTEXT,
     );
     expect(updated).toEqual({
       ...category,
@@ -615,32 +664,40 @@ describe('PrismaCatalogRepository with SQLite', () => {
       version: 1,
     });
     await expect(
-      repository.saveCategory({ ...updated, name: 'Stale overwrite' }, 0),
+      repository.saveCategory(
+        { ...updated, name: 'Stale overwrite' },
+        0,
+        CONTEXT,
+      ),
     ).rejects.toBeInstanceOf(CatalogVersionConflictError);
     await expect(
-      repository.deleteCategory(category.id, 0),
+      repository.deleteCategory(category.id, 0, CONTEXT),
     ).rejects.toBeInstanceOf(CatalogVersionConflictError);
     expect(await repository.findCategoryById(category.id)).toEqual(updated);
-    await repository.deleteCategory(category.id, updated.version);
+    await repository.deleteCategory(category.id, updated.version, CONTEXT);
     expect(await repository.findCategoryById(category.id)).toBeNull();
     await expect(
-      repository.deleteCategory(category.id, updated.version),
+      repository.deleteCategory(category.id, updated.version, CONTEXT),
     ).rejects.toBeInstanceOf(CatalogNotFoundError);
     await expect(
-      repository.saveCategory(updated, updated.version),
+      repository.saveCategory(updated, updated.version, CONTEXT),
     ).rejects.toBeInstanceOf(CatalogNotFoundError);
   });
 
   it('rolls back category revisions when a slug is already reserved', async () => {
-    await repository.createCategory({
-      ...category,
-      id: 'occupied-category',
-      slug: 'occupied',
-    });
+    await repository.createCategory(
+      {
+        ...category,
+        id: 'occupied-category',
+        slug: 'occupied',
+      },
+      CONTEXT,
+    );
     await expect(
       repository.saveCategory(
         { ...category, name: 'Must roll back', slug: 'occupied' },
         0,
+        CONTEXT,
       ),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     expect(await repository.findCategoryById(category.id)).toEqual(category);
@@ -649,7 +706,11 @@ describe('PrismaCatalogRepository with SQLite', () => {
   it('permits only one category writer for a shared version', async () => {
     const results = await Promise.allSettled(
       ['One', 'Two'].map((name) =>
-        repository.saveCategory({ ...category, name }, category.version),
+        repository.saveCategory(
+          { ...category, name },
+          category.version,
+          CONTEXT,
+        ),
       ),
     );
     const successes = results.filter((result) => result.status === 'fulfilled');
@@ -672,9 +733,10 @@ describe('PrismaCatalogRepository with SQLite', () => {
           publishedAt: status === 'PUBLISHED' ? now : null,
           variants: [variant('category-dependent-variant')],
         }),
+        CONTEXT,
       );
       await expect(
-        repository.deleteCategory(category.id, category.version),
+        repository.deleteCategory(category.id, category.version, CONTEXT),
       ).rejects.toBeInstanceOf(CatalogConflictError);
       expect(await repository.findCategoryById(category.id)).toEqual(category);
       expect(
@@ -689,8 +751,11 @@ describe('PrismaCatalogRepository with SQLite', () => {
     try {
       const otherRepository = new PrismaCatalogRepository(otherPrisma);
       const results = await Promise.allSettled([
-        repository.deleteCategory(category.id, category.version),
-        otherRepository.createProduct(product('category-racing-product')),
+        repository.deleteCategory(category.id, category.version, CONTEXT),
+        otherRepository.createProduct(
+          product('category-racing-product'),
+          CONTEXT,
+        ),
       ]);
       expect(
         results.filter((result) => result.status === 'fulfilled'),
@@ -717,10 +782,11 @@ describe('PrismaCatalogRepository with SQLite', () => {
     await expect(
       repository.createProduct(
         product('orphan', { categoryId: 'missing-category' }),
+        CONTEXT,
       ),
     ).rejects.toBeInstanceOf(CatalogNotFoundError);
     expect(await repository.findProductById('orphan')).toBeNull();
-    await repository.createProduct(product('dependent-product'));
+    await repository.createProduct(product('dependent-product'), CONTEXT);
     await expect(
       prisma.catalogCategory.delete({ where: { id: category.id } }),
     ).rejects.toThrow();
@@ -732,12 +798,14 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('first', {
         variants: [variant('first-variant', { sku: 'GLOBAL-SKU' })],
       }),
+      CONTEXT,
     );
     await expect(
       repository.createProduct(
         product('second', {
           variants: [variant('second-variant', { sku: 'GLOBAL-SKU' })],
         }),
+        CONTEXT,
       ),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     expect(await repository.findProductById('second')).toBeNull();
@@ -748,6 +816,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('editable', {
         variants: [variant('stable-variant')],
       }),
+      CONTEXT,
     );
     const after = await repository.saveProduct(
       {
@@ -764,6 +833,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         ],
       },
       before.version,
+      CONTEXT,
     );
     expect(after.version).toBe(1);
     expect(after.createdAt).toEqual(before.createdAt);
@@ -790,6 +860,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           }),
         ],
       }),
+      CONTEXT,
     );
     const copy = await repository.findProductById(before.id);
     copy!.images[0].alt = 'External mutation';
@@ -807,6 +878,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         ],
       },
       before.version,
+      CONTEXT,
     );
     expect(after.images).toEqual([
       { url: 'https://example.com/new.jpg', alt: 'New bag' },
@@ -831,7 +903,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       }),
       { minPriceAmount: 99 },
     );
-    const before = await repository.createProduct(forged);
+    const before = await repository.createProduct(forged, CONTEXT);
     expect(
       (
         await prisma.catalogProduct.findUniqueOrThrow({
@@ -848,6 +920,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         })),
       },
       before.version,
+      CONTEXT,
     );
     expect(
       (
@@ -862,6 +935,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         variants: after.variants.map((item) => ({ ...item, isActive: false })),
       },
       after.version,
+      CONTEXT,
     );
     expect(
       (
@@ -877,6 +951,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('concurrent', {
         variants: [variant('original-variant')],
       }),
+      CONTEXT,
     );
     const results = await Promise.allSettled(
       [100, 200].map((priceAmount) =>
@@ -887,6 +962,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
             variants: [{ ...before.variants[0], priceAmount }],
           },
           before.version,
+          CONTEXT,
         ),
       ),
     );
@@ -905,6 +981,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('independent-connections', {
         variants: [variant('shared-variant')],
       }),
+      CONTEXT,
     );
     const otherPrisma = new PrismaService();
     await otherPrisma.$connect();
@@ -921,6 +998,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
               ],
             },
             before.version,
+            CONTEXT,
           ),
         ),
       );
@@ -946,11 +1024,13 @@ describe('PrismaCatalogRepository with SQLite', () => {
         product('independent-one', {
           variants: [variant('independent-variant-one')],
         }),
+        CONTEXT,
       ),
       repository.createProduct(
         product('independent-two', {
           variants: [variant('independent-variant-two')],
         }),
+        CONTEXT,
       ),
     ]);
     const otherPrisma = new PrismaService();
@@ -968,6 +1048,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
               ],
             },
             snapshot.version,
+            CONTEXT,
           ),
         ),
       );
@@ -987,11 +1068,13 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('rollback', {
         variants: [variant('existing-variant')],
       }),
+      CONTEXT,
     );
     await repository.createProduct(
       product('other-product', {
         variants: [variant('other-variant', { sku: 'OCCUPIED' })],
       }),
+      CONTEXT,
     );
     await expect(
       repository.saveProduct(
@@ -1011,6 +1094,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           ],
         },
         before.version,
+        CONTEXT,
       ),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     expect(await repository.findProductById(before.id)).toEqual(before);
@@ -1027,11 +1111,15 @@ describe('PrismaCatalogRepository with SQLite', () => {
   });
 
   it('does not permit a variant ID to mutate another product', async () => {
-    const before = await repository.createProduct(product('owner-one'));
+    const before = await repository.createProduct(
+      product('owner-one'),
+      CONTEXT,
+    );
     const other = await repository.createProduct(
       product('owner-two', {
         variants: [variant('foreign-variant')],
       }),
+      CONTEXT,
     );
     await expect(
       repository.saveProduct(
@@ -1042,6 +1130,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
           ],
         },
         before.version,
+        CONTEXT,
       ),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     expect(await repository.findProductById(before.id)).toEqual(before);
@@ -1053,28 +1142,34 @@ describe('PrismaCatalogRepository with SQLite', () => {
       product('retained', {
         variants: [variant('reserved-sku')],
       }),
+      CONTEXT,
     );
     await expect(
-      repository.saveProduct({ ...before, variants: [] }, before.version),
+      repository.saveProduct(
+        { ...before, variants: [] },
+        before.version,
+        CONTEXT,
+      ),
     ).rejects.toBeInstanceOf(CatalogConflictError);
     expect(await repository.findProductById(before.id)).toEqual(before);
   });
 
   it('distinguishes missing aggregates from stale revisions without creating rows', async () => {
     await expect(
-      repository.saveProduct(product('missing'), 0),
+      repository.saveProduct(product('missing'), 0, CONTEXT),
     ).rejects.toBeInstanceOf(CatalogNotFoundError);
-    const before = await repository.createProduct(product('present'));
-    await expect(repository.saveProduct(before, 4)).rejects.toBeInstanceOf(
-      CatalogVersionConflictError,
-    );
+    const before = await repository.createProduct(product('present'), CONTEXT);
+    await expect(
+      repository.saveProduct(before, 4, CONTEXT),
+    ).rejects.toBeInstanceOf(CatalogVersionConflictError);
     expect(await repository.findProductById(before.id)).toEqual(before);
   });
 
   it('filters drafts, archived products and inactive variants in public queries', async () => {
-    const draft = await repository.createProduct(product('draft'));
+    const draft = await repository.createProduct(product('draft'), CONTEXT);
     const archived = await repository.createProduct(
       product('archived', { status: 'ARCHIVED' }),
+      CONTEXT,
     );
     const published = await repository.createProduct(
       product('published', {
@@ -1082,6 +1177,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         publishedAt: now,
         variants: [variant('active'), variant('inactive', { isActive: false })],
       }),
+      CONTEXT,
     );
     expect(await repository.findPublishedProductBySlug(draft.slug)).toBeNull();
     expect(
@@ -1102,13 +1198,16 @@ describe('PrismaCatalogRepository with SQLite', () => {
   });
 
   it('combines search, category and status filters with stable pagination and totals', async () => {
-    const otherCategory = await repository.createCategory({
-      id: 'another-category',
-      name: 'Tea',
-      slug: 'tea',
-      version: 0,
-      createdAt: now,
-    });
+    const otherCategory = await repository.createCategory(
+      {
+        id: 'another-category',
+        name: 'Tea',
+        slug: 'tea',
+        version: 0,
+        createdAt: now,
+      },
+      CONTEXT,
+    );
     for (const snapshot of [
       product('a-coffee', {
         name: 'Coffee Alpha',
@@ -1131,7 +1230,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         variants: [variant('other')],
       }),
     ]) {
-      await repository.createProduct(snapshot);
+      await repository.createProduct(snapshot, CONTEXT);
     }
     const query = { page: 1, limit: 1, q: 'COFFEE', categoryId: category.id };
     const first = await repository.listPublishedProducts(query);
@@ -1187,7 +1286,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
         ],
       }),
     ])
-      await repository.createProduct(snapshot);
+      await repository.createProduct(snapshot, CONTEXT);
     const query = { page: 1, limit: 10 };
     expect(
       (
@@ -1256,6 +1355,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
   it('rejects invalid persisted image and attribute shapes instead of leaking arbitrary JSON', async () => {
     await repository.createProduct(
       product('bad-json', { variants: [variant('bad-json-variant')] }),
+      CONTEXT,
     );
     await prisma.catalogProduct.update({
       where: { id: 'bad-json' },
@@ -1284,7 +1384,7 @@ describe('PrismaCatalogRepository with SQLite', () => {
   ])(
     'keeps SQL price and currency constraints as a persistence backstop: %j',
     async (invalid) => {
-      await repository.createProduct(product('constraint-parent'));
+      await repository.createProduct(product('constraint-parent'), CONTEXT);
       await expect(
         prisma.catalogVariant.create({
           data: {

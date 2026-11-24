@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../../../platform/database/generated/client.js';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
 import { isUserRole, USER_ROLES } from '../../domain/types/user-role.type.js';
 import type {
@@ -22,7 +23,7 @@ export class PrismaSessionRepository implements SessionRepository {
           AND "status" = 'ACTIVE'
           AND "deletedAt" IS NULL
           AND "authVersion" = ${session.authVersion}
-          AND "role" IN ('ADMIN', 'EMPLOYER', 'CUSTOMER')
+          AND "role" IN (${Prisma.join([...USER_ROLES])})
       `;
       if (matched !== 1) return false;
       await tx.authSession.create({ data: session });

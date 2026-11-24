@@ -1,28 +1,20 @@
-export interface ShopAccountState {
+import type { UserRole } from '../../../identity/contracts/identity.roles.js';
+import type { ShopStatus } from '../entities/shop.js';
+
+/** An account Identity has confirmed is active and holds `role` right now. */
+export interface ShopAccount {
   id: string;
-  role: string;
-  status: string;
-  deletedAt: Date | null;
+  role: UserRole;
 }
 
-export function isActiveShopAccount(
-  user: ShopAccountState | null,
-): user is ShopAccountState & { role: 'ADMIN' | 'EMPLOYER' | 'CUSTOMER' } {
-  return (
-    user !== null &&
-    user.status === 'ACTIVE' &&
-    user.deletedAt === null &&
-    (user.role === 'ADMIN' ||
-      user.role === 'EMPLOYER' ||
-      user.role === 'CUSTOMER')
-  );
+export function mayManageShop(ownerId: string, account: ShopAccount): boolean {
+  return account.role === 'ADMIN' || ownerId === account.id;
 }
 
-export function mayManageShop(
-  ownerId: string,
-  user: ShopAccountState,
+/** Kept in sync with `sellableShopWhere`/`sellableShopIdsSql` used for list queries. */
+export function isSellableShop(
+  shop: { status: ShopStatus },
+  ownerActive: boolean,
 ): boolean {
-  return (
-    isActiveShopAccount(user) && (user.role === 'ADMIN' || ownerId === user.id)
-  );
+  return shop.status === 'ACTIVE' && ownerActive;
 }

@@ -7,7 +7,7 @@ import {
 } from './shop.js';
 import { ShopValidationError } from '../errors/shop.errors.js';
 import {
-  isActiveShopAccount,
+  isSellableShop,
   mayManageShop,
 } from '../policies/shop-access.policy.js';
 
@@ -129,31 +129,22 @@ describe('Shop domain', () => {
   );
 
   it.each(['CUSTOMER', 'EMPLOYER'] as const)(
-    'allows a live %s owner to manage only their own shop',
+    'allows a %s owner to manage only their own shop',
     (role) => {
-      const owner = {
-        id: input.ownerId,
-        role,
-        status: 'ACTIVE',
-        deletedAt: null,
-      };
+      const owner = { id: input.ownerId, role };
       expect(mayManageShop(input.ownerId, owner)).toBe(true);
       expect(mayManageShop(input.ownerId, { ...owner, id: 'other' })).toBe(
         false,
       );
-      expect(
-        mayManageShop(input.ownerId, { ...owner, id: 'admin', role: 'ADMIN' }),
-      ).toBe(true);
-      expect(mayManageShop(input.ownerId, { ...owner, status: 'LOCKED' })).toBe(
-        false,
+      expect(mayManageShop(input.ownerId, { id: 'admin', role: 'ADMIN' })).toBe(
+        true,
       );
-      expect(mayManageShop(input.ownerId, { ...owner, deletedAt: now })).toBe(
-        false,
-      );
-      expect(isActiveShopAccount({ ...owner, role: 'UNSUPPORTED' })).toBe(
-        false,
-      );
-      expect(isActiveShopAccount(null)).toBe(false);
     },
   );
+
+  it('sells only from an active shop whose owner is active', () => {
+    expect(isSellableShop({ status: 'ACTIVE' }, true)).toBe(true);
+    expect(isSellableShop({ status: 'SUSPENDED' }, true)).toBe(false);
+    expect(isSellableShop({ status: 'ACTIVE' }, false)).toBe(false);
+  });
 });

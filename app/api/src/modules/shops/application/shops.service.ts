@@ -1,4 +1,4 @@
-import type { ShopActor } from '../contracts/shops.api.js';
+import type { ShopAccess, ShopActor } from '../contracts/shops.api.js';
 import {
   assertShopVersion,
   changeShopStatus,
@@ -8,19 +8,26 @@ import {
 } from '../domain/entities/shop.js';
 import type { Shop, ShopStatus } from '../domain/entities/shop.js';
 import {
+  ShopAccessDeniedError,
   ShopNotFoundError,
+  ShopUnavailableError,
   ShopVersionConflictError,
 } from '../domain/errors/shop.errors.js';
-import type { ShopRepository } from './ports/shop.repository.js';
+import {
+  isSellableShop,
+  mayManageShop,
+} from '../domain/policies/shop-access.policy.js';
+import type { ShopAccount } from '../domain/policies/shop-access.policy.js';
+import type { ShopRepository, ShopStore } from './ports/shop.repository.js';
 
-export class ShopsService {
+export class ShopsService implements ShopAccess {
   constructor(
     private readonly shops: ShopRepository,
     private readonly ids: { next(): string },
     private readonly clock: { now(): Date },
   ) {}
 
-  create(
+  async create(
     input: { name: string; slug: string },
     actor: ShopActor,
   ): Promise<Shop> {
@@ -31,16 +38,22 @@ export class ShopsService {
       slug: input.slug,
       now: this.clock.now(),
     });
-    return this.shops.create(shop, actor);
+    return this.shops.transaction(actor.userId, async (store) => {
+      await this.account(store, actor);
+      return store.insert(shop);
+    });
   }
 
-  listMine(actor: ShopActor): Promise<Shop[]> {
-    return this.shops.listMine(actor);
+  async listMine(actor: ShopActor): Promise<Shop[]> {
+    const account = await this.account(this.shops, actor);
+    return this.shops.listByOwner(account.id);
   }
 
   async getPublic(id: string) {
-    const shop = await this.shops.findPublicById(shopId(id));
-    if (!shop) throw new ShopNotFoundError();
+    const found = await this.shops.findWithOwnerState(shopId(id));
+    if (!found || !isSellableShop(found.shop, found.ownerActive))
+      throw new ShopNotFoundError();
+    const { shop } = found;
     return {
       id: shop.id,
       name: shop.name,
@@ -56,15 +69,18 @@ export class ShopsService {
     actor: ShopActor,
   ): Promise<Shop> {
     assertShopVersion(input.version);
-    id = shopId(id);
-    await this.shops.requireManageable(id, actor);
-    const current = await this.current(id, input.version);
-    const candidate = updateShop(
-      current,
-      { name: input.name, slug: input.slug },
-      this.clock.now(),
-    );
-    return this.shops.save(candidate, input.version, actor);
+    const key = shopId(id);
+    return this.shops.transaction(actor.userId, async (store) => {
+      const current = await this.manageable(store, key, actor);
+      if (current.version !== input.version)
+        throw new ShopVersionConflictError();
+      const candidate = updateShop(
+        current,
+        { name: input.name, slug: input.slug },
+        this.clock.now(),
+      );
+      return store.save(candidate, input.version);
+    });
   }
 
   async setStatus(
@@ -73,16 +89,62 @@ export class ShopsService {
     actor: ShopActor,
   ): Promise<Shop> {
     assertShopVersion(input.version);
-    await this.shops.requireAdministrator(actor);
-    const current = await this.current(shopId(id), input.version);
-    const candidate = changeShopStatus(current, input.status, this.clock.now());
-    return this.shops.saveStatus(candidate, input.version, actor);
+    const key = shopId(id);
+    return this.shops.transaction(actor.userId, async (store) => {
+      const account = await this.account(store, actor);
+      if (account.role !== 'ADMIN')
+        throw new ShopAccessDeniedError('Administrator access is required');
+      const current = await store.findById(key);
+      if (!current) throw new ShopNotFoundError();
+      if (current.version !== input.version)
+        throw new ShopVersionConflictError();
+      const candidate = changeShopStatus(
+        current,
+        input.status,
+        this.clock.now(),
+      );
+      return store.saveStatus(candidate, input.version);
+    });
   }
 
-  private async current(id: string, expectedVersion: number): Promise<Shop> {
-    const shop = await this.shops.findById(id);
-    if (!shop) throw new ShopNotFoundError();
-    if (shop.version !== expectedVersion) throw new ShopVersionConflictError();
-    return shop;
+  async requireManageable(id: string, actor: ShopActor): Promise<void> {
+    await this.manageable(this.shops, shopId(id), actor);
+  }
+
+  async assertSellable(ids: readonly string[]): Promise<void> {
+    const unique = [...new Set(ids.map(shopId))];
+    if (unique.length === 0) return;
+    const found = await this.shops.findManyWithOwnerState(unique);
+    const sellable = found.filter((item) =>
+      isSellableShop(item.shop, item.ownerActive),
+    );
+    if (sellable.length !== unique.length) throw new ShopUnavailableError();
+  }
+
+  private async account(
+    store: ShopStore,
+    actor: ShopActor,
+  ): Promise<ShopAccount> {
+    const account = await store.findActiveAccount({
+      userId: shopId(actor.userId),
+      role: actor.role,
+    });
+    if (!account) throw new ShopAccessDeniedError();
+    return account;
+  }
+
+  private async manageable(
+    store: ShopStore,
+    id: string,
+    actor: ShopActor,
+  ): Promise<Shop> {
+    const account = await this.account(store, actor);
+    const found = await store.findWithOwnerState(id);
+    if (!found) throw new ShopNotFoundError();
+    if (!mayManageShop(found.shop.ownerId, account))
+      throw new ShopAccessDeniedError();
+    if (!isSellableShop(found.shop, found.ownerActive))
+      throw new ShopUnavailableError();
+    return found.shop;
   }
 }

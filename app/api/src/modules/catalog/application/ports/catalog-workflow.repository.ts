@@ -58,6 +58,6 @@ export interface CatalogWorkflowRepository {
     status: 'PENDING' | 'APPROVED' | 'REJECTED',
     limit: number,
   ): Promise<CatalogRevision[]>;
-  
+
   audit(entityId: string, limit: number): Promise<unknown[]>;
 }

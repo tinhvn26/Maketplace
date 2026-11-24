@@ -44,7 +44,7 @@ export class CatalogAdminService {
     private readonly media?: MediaAssets,
   ) {}
 
-  createCategory(input: CreateCategoryInput, context?: CatalogMutationContext) {
+  createCategory(input: CreateCategoryInput, context: CatalogMutationContext) {
     const category = createCategory({
       id: this.ids.next(),
       name: input.name,
@@ -53,9 +53,7 @@ export class CatalogAdminService {
       attributeDefinitions: input.attributeDefinitions,
       now: this.clock.now(),
     });
-    return context
-      ? this.catalog.createCategory(category, context)
-      : this.catalog.createCategory(category);
+    return this.catalog.createCategory(category, context);
   }
 
   listCategories(): Promise<Category[]> {
@@ -71,7 +69,7 @@ export class CatalogAdminService {
   async updateCategory(
     id: string,
     input: UpdateCategoryInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<Category> {
     const current = await this.categoryForMutation(id, input.version);
     const category = updateCategory(current, {
@@ -80,25 +78,21 @@ export class CatalogAdminService {
       parentId: input.parentId,
       attributeDefinitions: input.attributeDefinitions,
     });
-    return context
-      ? this.catalog.saveCategory(category, input.version, context)
-      : this.catalog.saveCategory(category, input.version);
+    return this.catalog.saveCategory(category, input.version, context);
   }
 
   async deleteCategory(
     id: string,
     input: ProductVersionInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<void> {
     const current = await this.categoryForMutation(id, input.version);
-    if (context)
-      await this.catalog.deleteCategory(current.id, input.version, context);
-    else await this.catalog.deleteCategory(current.id, input.version);
+    await this.catalog.deleteCategory(current.id, input.version, context);
   }
 
   async createProduct(
     input: CreateProductInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     const product = Product.create({
       id: this.ids.next(),
@@ -116,9 +110,7 @@ export class CatalogAdminService {
       now: this.clock.now(),
     });
     await this.requireCategory(product.toSnapshot().categoryId);
-    return context
-      ? this.catalog.createProduct(product.toSnapshot(), context)
-      : this.catalog.createProduct(product.toSnapshot());
+    return this.catalog.createProduct(product.toSnapshot(), context);
   }
 
   async getProduct(id: string): Promise<ProductSnapshot> {
@@ -143,7 +135,7 @@ export class CatalogAdminService {
   async updateProduct(
     id: string,
     input: UpdateProductInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     return this.mutate(
       id,
@@ -175,7 +167,7 @@ export class CatalogAdminService {
   addVariant(
     id: string,
     input: AddVariantInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     return this.mutate(
       id,
@@ -206,7 +198,7 @@ export class CatalogAdminService {
     id: string,
     variantId: string,
     input: UpdateVariantInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     return this.mutate(
       id,
@@ -235,7 +227,7 @@ export class CatalogAdminService {
   publishProduct(
     id: string,
     input: ProductVersionInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     return this.mutate(
       id,
@@ -248,7 +240,7 @@ export class CatalogAdminService {
   archiveProduct(
     id: string,
     input: ProductVersionInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     return this.mutate(
       id,
@@ -261,7 +253,7 @@ export class CatalogAdminService {
   unpublishProduct(
     id: string,
     input: ProductVersionInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     return this.mutate(
       id,
@@ -274,7 +266,7 @@ export class CatalogAdminService {
   restoreProduct(
     id: string,
     input: ProductVersionInput,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     return this.mutate(
       id,
@@ -308,7 +300,7 @@ export class CatalogAdminService {
     id: string,
     expectedVersion: number,
     change: (product: Product) => void | Promise<void>,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<ProductSnapshot> {
     assertProductVersion(expectedVersion);
     const current = await this.getProduct(id);
@@ -320,22 +312,19 @@ export class CatalogAdminService {
     const product = Product.restore(current);
     await change(product);
     // Persistence repeats the version check atomically with all variant writes.
-    return context
-      ? this.catalog.saveProduct(product.toSnapshot(), expectedVersion, context)
-      : this.catalog.saveProduct(product.toSnapshot(), expectedVersion);
+    return this.catalog.saveProduct(
+      product.toSnapshot(),
+      expectedVersion,
+      context,
+    );
   }
 
   private async prepareImages(
     images: ProductImageInput[] | undefined,
     shopId: string | null,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ) {
-    if (
-      images === undefined ||
-      !Array.isArray(images) ||
-      !context ||
-      !this.media
-    )
+    if (images === undefined || !Array.isArray(images) || !this.media)
       return images;
     const ids = images.flatMap((image) =>
       image?.assetId ? [image.assetId] : [],

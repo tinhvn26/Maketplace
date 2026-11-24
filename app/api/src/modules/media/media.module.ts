@@ -61,6 +61,6 @@ function mediaBaseUrl(): string {
     MediaAuthenticatedGuard,
     MediaExceptionFilter,
   ],
-  exports: [MEDIA_ASSETS, MediaService],
+  exports: [MEDIA_ASSETS],
 })
 export class MediaModule {}

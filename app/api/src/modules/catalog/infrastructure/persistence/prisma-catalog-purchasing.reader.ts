@@ -2,9 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
 import type { CatalogPurchasingReader } from '../../application/ports/catalog-purchasing.reader.js';
 import type { CatalogVariants } from '../../contracts/catalog-variants.api.js';
+import { sellableShopWhere } from '../../../shops/contracts/shops.persistence.js';
 
 @Injectable()
-export class PrismaCatalogPurchasingReader implements CatalogPurchasingReader, CatalogVariants {
+export class PrismaCatalogPurchasingReader
+  implements CatalogPurchasingReader, CatalogVariants
+{
   constructor(private readonly prisma: PrismaService) {}
 
   async findVariantShops(ids: readonly string[]) {
@@ -30,15 +33,7 @@ export class PrismaCatalogPurchasingReader implements CatalogPurchasingReader, C
           currency: 'VND',
           product: {
             status: 'PUBLISHED',
-            OR: [
-              { shopId: null },
-              {
-                shop: {
-                  status: 'ACTIVE',
-                  owner: { status: 'ACTIVE', deletedAt: null },
-                },
-              },
-            ],
+            OR: [{ shopId: null }, { shop: sellableShopWhere }],
           },
         },
         select: {

@@ -55,7 +55,7 @@ export class CatalogQuoteService implements CatalogPricing {
       }
       ids.add(line.variantId);
     }
-    
+
     const records = await this.reader.findPurchasableVariants([...ids]);
     const byId = new Map(records.map((record) => [record.variantId, record]));
 

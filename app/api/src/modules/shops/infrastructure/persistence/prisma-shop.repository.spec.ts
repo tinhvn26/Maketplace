@@ -13,15 +13,16 @@ import {
   vi,
 } from 'vitest';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import { createShop } from '../../domain/entities/shop.js';
+import { ShopsService } from '../../application/shops.service.js';
 import {
   ShopAccessDeniedError,
   ShopUnavailableError,
   ShopVersionConflictError,
 } from '../../domain/errors/shop.errors.js';
 import { PrismaShopRepository } from './prisma-shop.repository.js';
+import { findShopState } from './shop.persistence.js';
 
-describe('PrismaShopRepository security transactions', () => {
+describe('ShopsService on PrismaShopRepository security transactions', () => {
   let prisma: PrismaService;
   let repository: PrismaShopRepository;
   let directory: string;
@@ -103,23 +104,16 @@ describe('PrismaShopRepository security transactions', () => {
     }
   });
 
+  const service = (repo: PrismaShopRepository = repository) =>
+    new ShopsService(repo, { next: () => 'shop-one' }, { now: () => now });
   const create = () =>
-    repository.create(
-      createShop({
-        id: 'shop-one',
-        ownerId: actor.userId,
-        name: 'Shop',
-        slug: 'shop-one',
-        now,
-      }),
-      actor,
-    );
+    service().create({ name: 'Shop', slug: 'shop-one' }, actor);
 
   it.each(['locked', 'deleted', 'transferred', 'suspended'])(
     'rechecks %s state after an earlier manageable-shop check without changing shop data',
     async (change) => {
       const shop = await create();
-      await repository.requireManageable(shop.id, actor);
+      await service().requireManageable(shop.id, actor);
       if (change === 'locked' || change === 'deleted')
         await prisma.user.update({
           where: { id: actor.userId },
@@ -135,9 +129,9 @@ describe('PrismaShopRepository security transactions', () => {
         });
       const before = await repository.findById(shop.id);
       await expect(
-        repository.save(
-          { ...shop, name: 'Must not persist' },
-          shop.version,
+        service().update(
+          shop.id,
+          { version: shop.version, name: 'Must not persist' },
           actor,
         ),
       ).rejects.toBeInstanceOf(
@@ -149,31 +143,44 @@ describe('PrismaShopRepository security transactions', () => {
 
   it('rechecks live administrator privileges before committing a status change', async () => {
     const shop = await create();
-    await repository.requireAdministrator(administrator);
     await prisma.user.update({
       where: { id: administrator.userId },
       data: { role: 'CUSTOMER' },
     });
     await expect(
-      repository.saveStatus({ ...shop, status: 'SUSPENDED' }, 0, administrator),
+      service().setStatus(
+        shop.id,
+        { version: 0, status: 'SUSPENDED' },
+        administrator,
+      ),
     ).rejects.toBeInstanceOf(ShopAccessDeniedError);
     expect(await repository.findById(shop.id)).toEqual(shop);
   });
 
-  it('does not allow callers to create a shop owned by another account', async () => {
-    await expect(
-      repository.create(
-        createShop({
-          id: 'stolen',
-          ownerId: 'other',
-          name: 'Stolen',
-          slug: 'stolen',
-          now,
-        }),
-        actor,
-      ),
-    ).rejects.toBeInstanceOf(ShopAccessDeniedError);
+  it('does not create a shop for a locked account', async () => {
+    await prisma.user.update({
+      where: { id: actor.userId },
+      data: { status: 'LOCKED' },
+    });
+    await expect(create()).rejects.toBeInstanceOf(ShopAccessDeniedError);
     expect(await prisma.shop.count()).toBe(0);
+  });
+
+  it('reports owner and sellability to other modules', async () => {
+    const shop = await create();
+    await expect(findShopState(prisma, shop.id)).resolves.toEqual({
+      ownerId: actor.userId,
+      sellable: true,
+    });
+    await prisma.user.update({
+      where: { id: actor.userId },
+      data: { deletedAt: now },
+    });
+    await expect(findShopState(prisma, shop.id)).resolves.toEqual({
+      ownerId: actor.userId,
+      sellable: false,
+    });
+    await expect(findShopState(prisma, 'missing')).resolves.toBeNull();
   });
 
   it('allows exactly one writer for an expected revision across independent database connections', async () => {
@@ -181,10 +188,17 @@ describe('PrismaShopRepository security transactions', () => {
     const otherPrisma = new PrismaService();
     await otherPrisma.$connect();
     try {
-      const writers = [repository, new PrismaShopRepository(otherPrisma)];
+      const writers = [
+        service(),
+        service(new PrismaShopRepository(otherPrisma)),
+      ];
       const results = await Promise.allSettled(
         writers.map((writer, index) =>
-          writer.save({ ...shop, name: `Writer ${index}` }, 0, actor),
+          writer.update(
+            shop.id,
+            { version: 0, name: `Writer ${index}` },
+            actor,
+          ),
         ),
       );
       const successes = results.filter(

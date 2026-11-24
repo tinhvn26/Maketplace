@@ -26,6 +26,7 @@ import { MediaValidationError } from '../../../domain/errors/media.errors.js';
 import type { AuthenticatedRequest } from '../../../../identity/contracts/identity.http.js';
 import { MediaAuthenticatedGuard } from '../guards/media-authenticated.guard.js';
 import { MediaExceptionFilter } from '../filters/media-exception.filter.js';
+import { isUserRole } from '../../../../identity/contracts/identity.roles.js';
 
 class UploadMediaRequest {
   @ValidateIf((_object, value) => value !== undefined)
@@ -72,12 +73,7 @@ export class MediaController {
   }
 
   private actor(request: AuthenticatedRequest): MediaActor {
-    if (
-      !request.userId ||
-      (request.role !== 'ADMIN' &&
-        request.role !== 'EMPLOYER' &&
-        request.role !== 'CUSTOMER')
-    )
+    if (!request.userId || !isUserRole(request.role))
       throw new UnauthorizedException();
     return { userId: request.userId, role: request.role };
   }

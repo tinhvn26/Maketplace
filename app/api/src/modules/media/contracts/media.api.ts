@@ -1,8 +1,10 @@
+import type { UserRole } from '../../identity/contracts/identity.roles.js';
+
 export const MEDIA_ASSETS = Symbol('MEDIA_ASSETS');
 
 export interface MediaActor {
   userId: string;
-  role: 'ADMIN' | 'EMPLOYER' | 'CUSTOMER';
+  role: UserRole;
 }
 
 export interface ResolvedMediaAsset {

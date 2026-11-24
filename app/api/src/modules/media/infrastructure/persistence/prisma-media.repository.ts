@@ -10,6 +10,11 @@ import {
   MediaNotFoundError,
 } from '../../domain/errors/media.errors.js';
 import {
+  findActiveAccount,
+  lockAccount,
+} from '../../../identity/contracts/identity.persistence.js';
+import { findShopState } from '../../../shops/contracts/shops.persistence.js';
+import {
   ShopNotFoundError,
   ShopUnavailableError,
 } from '../../../shops/contracts/shops.api.js';
@@ -20,7 +25,7 @@ export class PrismaMediaRepository implements MediaRepository {
 
   async create(asset: MediaAsset, actor: MediaActor): Promise<MediaAsset> {
     return this.prisma.$transaction(async (tx) => {
-      await this.lockActor(tx, actor);
+      await lockAccount(tx, actor.userId);
       await this.requireAccess(tx, asset.shopId, actor);
       if (asset.ownerId !== actor.userId) throw new MediaForbiddenError();
       return this.toAsset(await tx.mediaAsset.create({ data: asset }));
@@ -41,7 +46,7 @@ export class PrismaMediaRepository implements MediaRepository {
 
   async deleteUnused(id: string, actor: MediaActor): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await this.lockActor(tx, actor);
+      await lockAccount(tx, actor.userId);
       const current = await tx.mediaAsset.findUnique({ where: { id } });
       if (!current || current.status !== 'READY')
         throw new MediaNotFoundError();
@@ -61,55 +66,27 @@ export class PrismaMediaRepository implements MediaRepository {
     });
   }
 
-  private async lockActor(
-    tx: Prisma.TransactionClient,
-    actor: MediaActor,
-  ): Promise<void> {
-    await tx.$executeRaw`UPDATE "User" SET "authVersion" = "authVersion" WHERE "id" = ${actor.userId}`;
-  }
-
   private async requireAccess(
     tx: Prisma.TransactionClient,
     shopId: string | null,
     actor: MediaActor,
   ): Promise<void> {
-    const user = await tx.user.findUnique({
-      where: { id: actor.userId },
-      select: { id: true, role: true, status: true, deletedAt: true },
-    });
-    if (
-      !user ||
-      user.status !== 'ACTIVE' ||
-      user.deletedAt !== null ||
-      user.role !== actor.role ||
-      !['ADMIN', 'EMPLOYER', 'CUSTOMER'].includes(user.role)
-    )
+    if (!(await findActiveAccount(tx, actor)))
       throw new MediaForbiddenError(
         'An active account with current privileges is required',
       );
     if (shopId === null) {
-      if (user.role !== 'ADMIN')
+      if (actor.role !== 'ADMIN')
         throw new MediaForbiddenError(
           'Platform media requires administrator access',
         );
       return;
     }
-    const shop = await tx.shop.findUnique({
-      where: { id: shopId },
-      include: {
-        owner: { select: { role: true, status: true, deletedAt: true } },
-      },
-    });
+    const shop = await findShopState(tx, shopId);
     if (!shop) throw new ShopNotFoundError();
-    if (user.role !== 'ADMIN' && shop.ownerId !== user.id)
+    if (actor.role !== 'ADMIN' && shop.ownerId !== actor.userId)
       throw new MediaForbiddenError();
-    if (
-      shop.status !== 'ACTIVE' ||
-      shop.owner.status !== 'ACTIVE' ||
-      shop.owner.deletedAt !== null ||
-      !['ADMIN', 'EMPLOYER', 'CUSTOMER'].includes(shop.owner.role)
-    )
-      throw new ShopUnavailableError();
+    if (!shop.sellable) throw new ShopUnavailableError();
   }
 
   private toAsset(

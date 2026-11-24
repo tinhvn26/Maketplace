@@ -31,7 +31,7 @@ export class CatalogTaxonomyService {
 
   createBrand(
     input: { name: string; slug: string },
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ) {
     return this.brands.createBrand(
       createBrand({ ...input, id: this.ids.next(), now: this.clock.now() }),
@@ -42,7 +42,7 @@ export class CatalogTaxonomyService {
   async updateBrand(
     id: string,
     input: { version: number; name?: string; slug?: string },
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ) {
     assertProductVersion(input.version);
     const brand = await this.getBrand(id);
@@ -54,11 +54,11 @@ export class CatalogTaxonomyService {
       context,
     );
   }
-  
+
   async deleteBrand(
     id: string,
     input: { version: number },
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ) {
     assertProductVersion(input.version);
     const brand = await this.getBrand(id);

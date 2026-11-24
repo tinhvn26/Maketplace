@@ -18,7 +18,6 @@ import { ShopsAuthenticatedGuard } from './presentation/http/guards/shops-authen
   providers: [
     PrismaShopRepository,
     { provide: SHOP_REPOSITORY, useExisting: PrismaShopRepository },
-    { provide: SHOP_ACCESS, useExisting: PrismaShopRepository },
     {
       provide: ShopsService,
       inject: [SHOP_REPOSITORY],
@@ -29,6 +28,7 @@ import { ShopsAuthenticatedGuard } from './presentation/http/guards/shops-authen
           { now: () => new Date() },
         ),
     },
+    { provide: SHOP_ACCESS, useExisting: ShopsService },
     ShopsExceptionFilter,
     ShopsAuthenticatedGuard,
   ],

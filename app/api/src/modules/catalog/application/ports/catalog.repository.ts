@@ -68,7 +68,9 @@ export interface PublicCatalogReader {
 
   listPublishedProducts(query: ProductListQuery): Promise<ProductSummaryPage>;
 
-  browsePublishedProducts(query: CatalogBrowseQuery): Promise<CatalogBrowsePage>;
+  browsePublishedProducts(
+    query: CatalogBrowseQuery,
+  ): Promise<CatalogBrowsePage>;
 
   findPublishedProductBySlug(slug: string): Promise<ProductSnapshot | null>;
 }
@@ -78,19 +80,41 @@ export interface CatalogAdminRepository {
 
   findCategoryById(id: string): Promise<Category | null>;
 
-  createCategory(category: Category, context?: CatalogMutationContext): Promise<Category>;
+  createCategory(
+    category: Category,
+    context: CatalogMutationContext,
+  ): Promise<Category>;
 
-  saveCategory(category: Category, expectedVersion: number, context?: CatalogMutationContext): Promise<Category>;
+  saveCategory(
+    category: Category,
+    expectedVersion: number,
+    context: CatalogMutationContext,
+  ): Promise<Category>;
 
-  deleteCategory(id: string, expectedVersion: number, context?: CatalogMutationContext): Promise<void>;
+  deleteCategory(
+    id: string,
+    expectedVersion: number,
+    context: CatalogMutationContext,
+  ): Promise<void>;
 
   findProductById(id: string): Promise<ProductSnapshot | null>;
 
   listAdminProducts(query: AdminProductListQuery): Promise<ProductPage>;
 
-  createProduct(product: ProductSnapshot, context?: CatalogMutationContext): Promise<ProductSnapshot>;
-  
-  saveProduct(product: ProductSnapshot, expectedVersion: number, context?: CatalogMutationContext): Promise<ProductSnapshot>;
+  createProduct(
+    product: ProductSnapshot,
+    context: CatalogMutationContext,
+  ): Promise<ProductSnapshot>;
+
+  saveProduct(
+    product: ProductSnapshot,
+    expectedVersion: number,
+    context: CatalogMutationContext,
+  ): Promise<ProductSnapshot>;
 }
 
-export interface CatalogRepository extends PublicCatalogReader, CatalogAdminRepository, CatalogTaxonomyRepository {}
+export interface CatalogRepository
+  extends
+    PublicCatalogReader,
+    CatalogAdminRepository,
+    CatalogTaxonomyRepository {}

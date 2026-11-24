@@ -24,6 +24,7 @@ import {
   catalogJson,
   syncCatalogMedia,
 } from '../integrations/catalog-integrity.js';
+import { releaseMediaUsages } from '../../../media/contracts/media.persistence.js';
 import { PrismaCatalogRepository } from './prisma-catalog.repository.js';
 import {
   normalizeCategoryAttributeDefinitions,
@@ -232,9 +233,7 @@ export class PrismaCatalogWorkflowRepository implements CatalogWorkflowRepositor
           saved.baseVersion,
           { ...context, action: 'APPROVE_PRODUCT' },
         );
-      await tx.mediaUsage.deleteMany({
-        where: { kind: 'CATALOG_REVIEW', resourceId: id },
-      });
+      await releaseMediaUsages(tx, 'CATALOG_REVIEW', [id]);
       await auditCatalog(
         tx,
         context,

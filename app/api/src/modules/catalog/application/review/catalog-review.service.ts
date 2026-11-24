@@ -32,7 +32,7 @@ export class CatalogReviewService {
     this.admin(actor);
     return this.workflow.audit(id, limit);
   }
-  
+
   private admin(actor: CatalogActor) {
     if (actor.role !== 'ADMIN')
       throw new CatalogNotFoundError('Review not found');

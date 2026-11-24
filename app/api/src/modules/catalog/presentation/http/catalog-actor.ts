@@ -4,14 +4,10 @@ import type {
   CatalogActor,
   CatalogMutationContext,
 } from '../../application/ports/catalog-actor.js';
+import { isUserRole } from '../../../identity/contracts/identity.roles.js';
 
 export function catalogActor(request: AuthenticatedRequest): CatalogActor {
-  if (
-    !request.userId ||
-    (request.role !== 'ADMIN' &&
-      request.role !== 'EMPLOYER' &&
-      request.role !== 'CUSTOMER')
-  )
+  if (!request.userId || !isUserRole(request.role))
     throw new UnauthorizedException();
   return { userId: request.userId, role: request.role };
 }

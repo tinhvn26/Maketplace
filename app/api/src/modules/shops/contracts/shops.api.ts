@@ -1,8 +1,10 @@
+import type { UserRole } from '../../identity/contracts/identity.roles.js';
+
 export const SHOP_ACCESS = Symbol('SHOP_ACCESS');
 
 export interface ShopActor {
   userId: string;
-  role: 'ADMIN' | 'EMPLOYER' | 'CUSTOMER';
+  role: UserRole;
 }
 
 export interface ShopAccess {

@@ -6,17 +6,17 @@ export interface CatalogTaxonomyRepository {
 
   findBrandById(id: string): Promise<Brand | null>;
 
-  createBrand(brand: Brand, context?: CatalogMutationContext): Promise<Brand>;
+  createBrand(brand: Brand, context: CatalogMutationContext): Promise<Brand>;
 
   saveBrand(
     brand: Brand,
     expectedVersion: number,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<Brand>;
-  
+
   deleteBrand(
     id: string,
     expectedVersion: number,
-    context?: CatalogMutationContext,
+    context: CatalogMutationContext,
   ): Promise<void>;
 }

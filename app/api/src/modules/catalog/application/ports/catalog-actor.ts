@@ -1,6 +1,8 @@
+import type { UserRole } from '../../../identity/contracts/identity.roles.js';
+
 export interface CatalogActor {
   userId: string;
-  role: 'ADMIN' | 'EMPLOYER' | 'CUSTOMER';
+  role: UserRole;
 }
 
 export interface CatalogMutationContext {
