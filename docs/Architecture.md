@@ -131,7 +131,7 @@ Hiện có:
 - **Worker email (Identity):** gửi SMTP mỗi 5 giây; nhận email theo lease (một lần nhận có thời hạn); lỗi thì thử lại, chờ tăng dần từ 30 giây, tối đa 8 lần.
 - **Worker hết hạn reservation (Inventory):** mặc định chạy mỗi 30 giây.
 
-Cả hai chạy trong cùng tiến trình với API, an toàn khi nhiều instance cùng chạy nhờ compare-and-set và lease.
+Mặc định cả hai chạy trong cùng tiến trình với API, an toàn khi nhiều instance cùng chạy nhờ compare-and-set và lease. Để tránh mỗi instance cùng quét hạn reservation, đặt `INVENTORY_EMBEDDED_WORKER=false` cho các instance API và chạy một tiến trình riêng bằng `npm run start:worker` (`src/worker.ts`).
 
 Định hướng khi có Orders/Notifications:
 - Phân biệt domain event, integration event và command/job.
