@@ -1,18 +1,45 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import {
+  InMemoryMailTransport,
+  Mailer,
+  SmtpTransport,
+  type MailModuleOptions,
+} from '@nestjs/mail';
 import identityMailConfig from '../../../../config/identity-mail.config.js';
 import type {
   IdentityMailer,
   MailMessage,
 } from '../../application/ports/identity-mailer.js';
 
+/** Options for MailModule. The persisted outbox worker owns retries, so the Mailer tries once. */
+export function identityMailOptions(
+  config: ConfigType<typeof identityMailConfig>,
+): MailModuleOptions {
+  return {
+    // Outbox mode never sends (see send()), but MailModule always needs a transport.
+    transport:
+      config.mode === 'smtp'
+        ? new SmtpTransport({
+            host: config.host,
+            port: config.port,
+            secure: config.secure,
+            startTls: config.requireTLS ? 'required' : 'opportunistic',
+            auth: config.user
+              ? { user: config.user, pass: config.password! }
+              : undefined,
+            timeouts: { connect: '10s', greeting: '10s', command: '20s', data: '20s' },
+          })
+        : new InMemoryMailTransport(),
+    from: config.from,
+    retry: false,
+  };
+}
+
 @Injectable()
 export class SmtpIdentityMailer implements IdentityMailer {
-  private transport?: Transporter;
-
   constructor(
+    private readonly mailer: Mailer,
     @Inject(identityMailConfig.KEY)
     private readonly config: ConfigType<typeof identityMailConfig>,
   ) {}
@@ -21,22 +48,6 @@ export class SmtpIdentityMailer implements IdentityMailer {
     if (this.config.mode !== 'smtp') {
       throw new Error('SMTP delivery is not configured');
     }
-    this.transport ??= nodemailer.createTransport({
-      host: this.config.host,
-      port: this.config.port,
-      secure: this.config.secure,
-      requireTLS: this.config.requireTLS,
-      auth: this.config.user
-        ? { user: this.config.user, pass: this.config.password }
-        : undefined,
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 20_000,
-      disableFileAccess: true,
-      disableUrlAccess: true,
-      logger: false,
-      debug: false,
-    });
-    await this.transport.sendMail({ from: this.config.from, ...message });
+    await this.mailer.send(message);
   }
 }

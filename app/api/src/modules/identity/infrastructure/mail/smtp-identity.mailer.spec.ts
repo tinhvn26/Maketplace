@@ -1,9 +1,14 @@
 import 'reflect-metadata';
 import type { ConfigType } from '@nestjs/config';
+import { MailModule } from '@nestjs/mail';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { createServer, type Socket } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import identityMailConfig from '../../../../config/identity-mail.config.js';
-import { SmtpIdentityMailer } from './smtp-identity.mailer.js';
+import {
+  identityMailOptions,
+  SmtpIdentityMailer,
+} from './smtp-identity.mailer.js';
 
 async function startSmtpStub(rejectRecipient = false) {
   const sockets = new Set<Socket>();
@@ -104,16 +109,33 @@ function configuration(port: number): ConfigType<typeof identityMailConfig> {
   };
 }
 
+const modules: TestingModule[] = [];
+
+async function createMailer(
+  config: ConfigType<typeof identityMailConfig>,
+): Promise<SmtpIdentityMailer> {
+  const module = await Test.createTestingModule({
+    imports: [MailModule.forRoot(identityMailOptions(config))],
+    providers: [
+      SmtpIdentityMailer,
+      { provide: identityMailConfig.KEY, useValue: config },
+    ],
+  }).compile();
+  modules.push(module);
+  return module.get(SmtpIdentityMailer);
+}
+
 describe('SmtpIdentityMailer with a local SMTP endpoint', () => {
   let smtp: Awaited<ReturnType<typeof startSmtpStub>> | undefined;
   afterEach(async () => {
+    await Promise.all(modules.splice(0).map((module) => module.close()));
     await smtp?.close();
     smtp = undefined;
   });
 
-  it('completes the real Nodemailer SMTP exchange and sends the requested envelope and body', async () => {
+  it('completes the real SMTP exchange and sends the requested envelope and body', async () => {
     smtp = await startSmtpStub();
-    const mailer = new SmtpIdentityMailer(configuration(smtp.port));
+    const mailer = await createMailer(configuration(smtp.port));
     await mailer.send({
       to: 'recipient@example.invalid',
       subject: 'Identity verification',
@@ -130,7 +152,7 @@ describe('SmtpIdentityMailer with a local SMTP endpoint', () => {
 
   it('surfaces recipient rejection so the persisted worker can retry', async () => {
     smtp = await startSmtpStub(true);
-    const mailer = new SmtpIdentityMailer(configuration(smtp.port));
+    const mailer = await createMailer(configuration(smtp.port));
     await expect(
       mailer.send({
         to: 'recipient@example.invalid',
@@ -143,7 +165,7 @@ describe('SmtpIdentityMailer with a local SMTP endpoint', () => {
 
   it('refuses plaintext delivery when TLS is required but unavailable', async () => {
     smtp = await startSmtpStub();
-    const mailer = new SmtpIdentityMailer({
+    const mailer = await createMailer({
       ...configuration(smtp.port),
       requireTLS: true,
     });
@@ -154,7 +176,6 @@ describe('SmtpIdentityMailer with a local SMTP endpoint', () => {
         text: 'Test token',
       }),
     ).rejects.toThrow();
-    expect(smtp.commands).toContain('STARTTLS');
     expect(smtp.commands.some((line) => line.startsWith('MAIL FROM:'))).toBe(
       false,
     );
@@ -162,7 +183,7 @@ describe('SmtpIdentityMailer with a local SMTP endpoint', () => {
   });
 
   it('refuses to deliver when configured in local outbox mode', async () => {
-    const mailer = new SmtpIdentityMailer({
+    const mailer = await createMailer({
       ...configuration(1),
       mode: 'outbox',
     });

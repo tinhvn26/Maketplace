@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import type { ConfigType } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { MailModule } from '@nestjs/mail';
 import authConfig from '../../config/auth.config.js';
 import identityMailConfig from '../../config/identity-mail.config.js';
 import { DatabaseModule } from '../../platform/database/database.module.js';
@@ -40,7 +41,10 @@ import { PrismaSessionRepository } from './infrastructure/persistence/prisma-ses
 import { PrismaAccountActionRepository } from './infrastructure/persistence/prisma-account-action.repository.js';
 import { ScryptPasswordHasher } from './infrastructure/security/scrypt-password.hasher.js';
 import { JwtTokenIssuer } from './infrastructure/security/jwt-token.issuer.js';
-import { SmtpIdentityMailer } from './infrastructure/mail/smtp-identity.mailer.js';
+import {
+  identityMailOptions,
+  SmtpIdentityMailer,
+} from './infrastructure/mail/smtp-identity.mailer.js';
 import { IdentityMailWorker } from './infrastructure/mail/identity-mail.worker.js';
 import { PlainTextAccountActionMessageBuilder } from './infrastructure/mail/account-action-message.builder.js';
 import { PrismaRateLimitStore } from './infrastructure/persistence/prisma-rate-limit.store.js';
@@ -61,6 +65,12 @@ import { IdentityRateLimitGuard } from './presentation/http/guards/identity-rate
     ConfigModule.forFeature(authConfig),
     ConfigModule.forFeature(identityMailConfig),
     JwtModule.register({}),
+    MailModule.forRootAsync({
+      isGlobal: false,
+      imports: [ConfigModule.forFeature(identityMailConfig)],
+      inject: [identityMailConfig.KEY],
+      useFactory: identityMailOptions,
+    }),
     DatabaseModule,
   ],
   controllers: [
