@@ -118,6 +118,15 @@ describe('Prisma inventory adapters', () => {
         role: 'EMPLOYER',
       },
     });
+    await prisma.user.create({
+      data: {
+        id: 'admin',
+        emailNormalized: 'a@example.com',
+        fullName: 'Admin',
+        passwordHash: 'h',
+        role: 'ADMIN',
+      },
+    });
     await prisma.shop.create({
       data: { id: 'shop-1', name: 'Shop', slug: 'shop', ownerId: 'owner' },
     });
@@ -211,7 +220,7 @@ describe('Prisma inventory adapters', () => {
           seller,
         ),
       ).rejects.toThrow(InventoryConflictError);
-      const admin = { userId: 'owner', role: 'ADMIN' as const };
+      const admin = { userId: 'admin', role: 'ADMIN' as const };
       await warehouseService().create(
         { shopId: null },
         { name: 'P', code: 'P1' },
@@ -340,7 +349,7 @@ describe('Prisma inventory adapters', () => {
 
     it('scopes stock and movement listings to the addressed shop or platform', async () => {
       const [a] = await setup([['A', 1, 3]]);
-      const admin = { userId: 'owner', role: 'ADMIN' as const };
+      const admin = { userId: 'admin', role: 'ADMIN' as const };
       const platform = await warehouseService().create(
         { shopId: null },
         { name: 'P', code: 'P1' },

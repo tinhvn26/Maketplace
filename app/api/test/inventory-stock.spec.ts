@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  ShopAccessDeniedError,
+  ShopNotFoundError,
+  ShopUnavailableError,
+} from '../src/modules/shops/contracts/shops.api.js';
 import type { ShopAccess } from '../src/modules/shops/contracts/shops.api.js';
 import type { InventoryScope } from '../src/modules/inventory/application/shared/inventory-scope.js';
 import { InventoryAvailabilityService } from '../src/modules/inventory/application/availability/inventory-availability.service.js';
@@ -40,6 +45,8 @@ describe('Inventory warehouses and stock', () => {
   beforeEach(() => {
     sequence = 0;
     store = new InMemoryInventory();
+    store.shops.set('s1', { ownerId: 'u1', sellable: true });
+    store.shops.set('s2', { ownerId: 'u1', sellable: true });
     requireManageable = vi.fn<ShopAccess['requireManageable']>(
       async () => undefined,
     );
@@ -158,6 +165,31 @@ describe('Inventory warehouses and stock', () => {
       requireManageable.mockRejectedValueOnce(new Error('denied'));
       await expect(warehouse('hn')).rejects.toThrow('denied');
       expect(store.warehouses.size).toBe(0);
+    });
+
+    it('rechecks the shop and account inside the write transaction', async () => {
+      const w = await warehouse('hn');
+      await receive(w.id, 'v1', 10);
+      // requireManageable (mocked) still passes: the change lands after that check.
+      store.shops.set('s1', { ownerId: 'u1', sellable: false });
+      await expect(receive(w.id)).rejects.toThrow(ShopUnavailableError);
+      await expect(
+        warehouses.update(shop, w.id, { version: 0, name: 'x' }, seller),
+      ).rejects.toThrow(ShopUnavailableError);
+
+      store.shops.set('s1', { ownerId: 'someone-else', sellable: true });
+      await expect(receive(w.id)).rejects.toThrow(ShopAccessDeniedError);
+
+      store.shops.set('s1', { ownerId: 'u1', sellable: true });
+      store.inactiveUsers.add('u1');
+      await expect(warehouse('dn')).rejects.toThrow(InventoryAccessDeniedError);
+
+      store.shops.delete('s1');
+      store.inactiveUsers.clear();
+      await expect(receive(w.id)).rejects.toThrow(ShopNotFoundError);
+
+      expect(store.warehouses.size).toBe(1);
+      expect(store.movements).toHaveLength(1);
     });
   });
 

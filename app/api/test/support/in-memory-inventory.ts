@@ -23,6 +23,9 @@ export class InMemoryInventory implements InventoryUnitOfWork {
   /** Runs before every stock save; lets a test simulate a concurrent writer. */
   beforeStockSave?: () => void;
   stockSaves = 0;
+  /** What the write transaction sees of Shops and Identity. */
+  shops = new Map<string, { ownerId: string; sellable: boolean }>();
+  inactiveUsers = new Set<string>();
 
   async run<T>(work: (tx: InventoryRepositories) => Promise<T>): Promise<T> {
     const before = {
@@ -217,6 +220,14 @@ export class InMemoryInventory implements InventoryUnitOfWork {
             .sort((a, b) => a.expiresAt!.getTime() - b.expiresAt!.getTime())
             .slice(0, limit)
             .map((r) => r.id);
+        },
+      },
+      access: {
+        async isActiveAccount(actor) {
+          return !state.inactiveUsers.has(actor.userId);
+        },
+        async findShopState(shopId) {
+          return state.shops.get(shopId) ?? null;
         },
       },
     };

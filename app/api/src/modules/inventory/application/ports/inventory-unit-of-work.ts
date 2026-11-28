@@ -1,3 +1,4 @@
+import type { InventoryAccessReader } from './inventory-access.reader.js';
 import type { ReservationRepository } from './reservation.repository.js';
 import type { StockRepository } from './stock.repository.js';
 import type { WarehouseRepository } from './warehouse.repository.js';
@@ -8,6 +9,7 @@ export interface InventoryRepositories {
   warehouses: WarehouseRepository;
   stocks: StockRepository;
   reservations: ReservationRepository;
+  access: InventoryAccessReader;
 }
 
 export interface InventoryUnitOfWork {

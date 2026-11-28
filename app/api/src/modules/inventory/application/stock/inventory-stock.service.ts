@@ -31,7 +31,7 @@ import type {
   InventoryUnitOfWork,
 } from '../ports/inventory-unit-of-work.js';
 import { retryOnConflict } from '../shared/inventory-retry.js';
-import { authorizeScope } from '../shared/inventory-scope.js';
+import { authorizeScope, recheckScope } from '../shared/inventory-scope.js';
 import type { InventoryScope } from '../shared/inventory-scope.js';
 import {
   normalizePaging,
@@ -77,6 +77,7 @@ export class InventoryStockService {
     await this.assertVariantInScope(scope, variantId);
     return retryOnConflict(() =>
       this.unitOfWork.run(async (tx) => {
+        await recheckScope(tx.access, scope, actor);
         await this.requireWarehouse(tx, scope, warehouseId);
         const now = this.clock.now();
         const current =
@@ -120,6 +121,7 @@ export class InventoryStockService {
     const expectedVersion = inventoryVersion(input.version);
     return retryOnConflict(() =>
       this.unitOfWork.run(async (tx) => {
+        await recheckScope(tx.access, scope, actor);
         await this.requireWarehouse(tx, scope, warehouseId);
         const current = await tx.stocks.findByKey(warehouseId, variantId);
         if (!current) throw new InventoryNotFoundError('Stock not found');
@@ -171,6 +173,7 @@ export class InventoryStockService {
     await this.assertVariantInScope(scope, variantId);
     return retryOnConflict(() =>
       this.unitOfWork.run(async (tx) => {
+        await recheckScope(tx.access, scope, actor);
         await this.requireWarehouse(tx, scope, fromId);
         await this.requireWarehouse(tx, scope, toId);
         const source = await tx.stocks.findByKey(fromId, variantId);

@@ -21,7 +21,7 @@ import type {
 } from '../ports/inventory-runtime.js';
 import type { InventoryUnitOfWork } from '../ports/inventory-unit-of-work.js';
 import { retryOnConflict } from '../shared/inventory-retry.js';
-import { authorizeScope } from '../shared/inventory-scope.js';
+import { authorizeScope, recheckScope } from '../shared/inventory-scope.js';
 import type { InventoryScope } from '../shared/inventory-scope.js';
 
 export class InventoryWarehouseService {
@@ -46,7 +46,10 @@ export class InventoryWarehouseService {
       priority: input.priority,
       now: this.clock.now(),
     });
-    await this.unitOfWork.run((tx) => tx.warehouses.insert(warehouse));
+    await this.unitOfWork.run(async (tx) => {
+      await recheckScope(tx.access, scope, actor);
+      await tx.warehouses.insert(warehouse);
+    });
     return warehouse;
   }
 
@@ -71,6 +74,7 @@ export class InventoryWarehouseService {
     const warehouseId = inventoryId(id, 'warehouse identifier');
     return retryOnConflict(() =>
       this.unitOfWork.run(async (tx) => {
+        await recheckScope(tx.access, scope, actor);
         const current = await tx.warehouses.findById(warehouseId);
         // A warehouse of another shop is reported as missing, not forbidden.
         if (!current || current.shopId !== scope.shopId)

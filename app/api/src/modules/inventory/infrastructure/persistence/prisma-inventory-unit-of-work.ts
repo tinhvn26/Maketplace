@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
+import { findActiveAccount } from '../../../identity/contracts/identity.persistence.js';
+import { findShopState } from '../../../shops/contracts/shops.persistence.js';
 import type {
   InventoryRepositories,
   InventoryUnitOfWork,
@@ -18,6 +20,11 @@ function repositories(db: InventoryDatabase): InventoryRepositories {
     warehouses: new PrismaWarehouseRepository(db),
     stocks: new PrismaStockRepository(db),
     reservations: new PrismaReservationRepository(db),
+    access: {
+      isActiveAccount: async (actor) =>
+        (await findActiveAccount(db, actor)) !== null,
+      findShopState: (shopId) => findShopState(db, shopId),
+    },
   };
 }
 
