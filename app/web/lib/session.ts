@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { api } from "./api";
+import { api, type ApiResult } from "./api";
 import type { TokenPair } from "./refresh";
 import { ACCESS_COOKIE, REFRESH_COOKIE, sessionCookies } from "./session-cookies";
 
@@ -33,19 +33,26 @@ export async function clearSession(): Promise<void> {
   store.delete(REFRESH_COOKIE);
 }
 
-/** The signed-in user, or null. Deduplicated per request. */
-export const getMe = cache(async (): Promise<Me | null> => {
+/** null when there is no access cookie. Deduplicated per request. */
+const loadMe = cache(async (): Promise<ApiResult<Me> | null> => {
   if (!(await cookies()).has(ACCESS_COOKIE)) return null;
-  const result = await api<Me>("/user/me");
-  return result.ok ? result.data : null;
+  return api<Me>("/user/me");
 });
+
+/** The signed-in user, or null (also when the API is unavailable). */
+export async function getMe(): Promise<Me | null> {
+  const result = await loadMe();
+  return result?.ok ? result.data : null;
+}
 
 /**
  * For pages under /account. A cookie whose session was revoked elsewhere still looks valid to the proxy,
  * so send the browser to a route that can clear it instead of bouncing between /login and /account.
+ * Only a 401 ends the session: an outage or rate limit must not delete the cookies.
  */
 export async function requireMe(next: string): Promise<Me> {
-  const me = await getMe();
-  if (!me) redirect(`/session-expired?next=${encodeURIComponent(next)}`);
-  return me;
+  const result = await loadMe();
+  if (!result || result.status === 401) redirect(`/session-expired?next=${encodeURIComponent(next)}`);
+  if (!result.ok) throw new Error(`GET /user/me failed with status ${result.status}`);
+  return result.data;
 }
