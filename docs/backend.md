@@ -1,10 +1,10 @@
 # Làm việc với backend
 
-Dành cho người mới vào nhóm: đọc code ở đâu, gọi API ra sao, thêm tính năng và đổi database thế nào. Cài môi trường xem [installation.md](./installation.md). Endpoint xem [API.md](./API.md) (Identity, Inventory) và [Catalog.md](./Catalog.md) (Catalog, Shops, Media).
+Dành cho người mới vào nhóm: đọc code ở đâu, gọi API ra sao, thêm tính năng và đổi database thế nào. Cài môi trường xem [installation.md](./installation.md). Endpoint xem [API.md](./API.md) (Identity, Inventory), [Catalog.md](./Catalog.md) (Catalog, Shops, Media) và [Orders.md](./Orders.md) (Orders).
 
 ## 1. Tổng quan
 
-Backend nằm ở `app/api`: NestJS 12, TypeScript ESM (NodeNext), Prisma 7, SQLite qua `better-sqlite3`. `AppModule` gồm Identity, Catalog (Catalog import thêm Shops và Media), `InventoryHttpModule` và `InventoryWorkerModule`. Chưa có Cart, Orders, Payment.
+Backend nằm ở `app/api`: NestJS 12, TypeScript ESM (NodeNext), Prisma 7, SQLite qua `better-sqlite3`. `AppModule` gồm Identity, Catalog (Catalog import thêm Shops và Media), `InventoryHttpModule`, `OrdersModule` và `InventoryWorkerModule`. Chưa có Cart, Payment.
 
 ```text
 app/api/
@@ -13,7 +13,7 @@ app/api/
 ├── src/main.ts, src/app.module.ts
 ├── src/config/                 # auth, identity-mail, inventory
 ├── src/platform/database/      # PrismaService + generated client (không sửa tay)
-├── src/modules/{identity,shops,catalog,media,inventory}/
+├── src/modules/{identity,shops,catalog,media,inventory,orders}/
 ├── test/                       # e2e, test kiến trúc, test/support/
 └── scripts/benchmark-catalog.mjs
 ```
@@ -104,6 +104,7 @@ Không dùng `db push`, `migrate reset`, và không xoá database để "sửa" 
 | `20261106000000_separate_user_profile` | Chuyển avatar sang `UserProfile`, thêm `phoneNumber` |
 | `20261106010000_user_roles_customer_employer` | Role `USER` thành `CUSTOMER`, thêm `EMPLOYER` |
 | `20261122000000_inventory` | Kho, stock, movement, reservation, có `CHECK` |
+| `20261128000000_orders` | Checkout, order, dòng hàng (snapshot giá), có `CHECK` |
 
 ## 6. Test
 

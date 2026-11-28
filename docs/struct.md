@@ -15,8 +15,8 @@ Marketplate/
         │   ├── main.ts, app.module.ts
         │   ├── config/         # auth, identity-mail, inventory (registerAs)
         │   ├── platform/database/   # PrismaService, generated/ (gitignore)
-        │   └── modules/        # 5 module bên dưới
-        └── test/               # *.e2e-spec.ts, architecture.spec.ts, inventory-*.spec.ts, support/
+        │   └── modules/        # 6 module bên dưới
+        └── test/               # *.e2e-spec.ts, architecture.spec.ts, inventory-*.spec.ts, orders-*.spec.ts, support/
 ```
 
 ## Identity
@@ -131,3 +131,23 @@ inventory/
 ```
 
 Trạng thái reservation: `ACTIVE` → (`confirm`) `ALLOCATED` → (`ship` từng kho) `SHIPPED`. `release` chuyển sang `RELEASED`; worker chuyển reservation quá hạn sang `EXPIRED`. Chi tiết xem [API.md](./API.md#inventory).
+
+## Orders
+
+```text
+orders/
+├── orders.module.ts                  # Wiring; dùng CATALOG_PRICING, INVENTORY_RESERVATIONS, SHOP_ACCESS (chưa có contracts/)
+├── domain/
+│   ├── entities/order.ts             # Order (máy trạng thái PLACED → CONFIRMED → SHIPPED → DELIVERED, CANCELLED)
+│   ├── policies/order-input.policy.ts   # Validate input
+│   └── errors/
+├── application/
+│   ├── checkout/                     # Đặt hàng: báo giá, giữ hàng, tách order theo shop, idempotency
+│   ├── buyer/ · fulfilment/          # Người mua (xem, huỷ); chủ shop/ADMIN (confirm, ship, deliver, huỷ)
+│   ├── shared/                       # transition (CAS + recheck), releaseForCancel, đổi lỗi Catalog/Inventory, view
+│   └── ports/order-unit-of-work.ts   # Unit of work, store, access reader, actor
+├── infrastructure/persistence/       # prisma-order.store.ts, prisma-order-unit-of-work.ts
+└── presentation/http/                # orders, seller-orders, admin-orders controller; dto, decorator, guard, filter
+```
+
+Chi tiết xem [Orders.md](./Orders.md).

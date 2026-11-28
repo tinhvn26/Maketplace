@@ -32,7 +32,7 @@ Ví dụ phụ thuộc sai: entity gọi `PrismaService`; service import control
 ```text
 src/
 ├── main.ts            # bootstrap, ValidationPipe toàn cục (transform, whitelist, forbidNonWhitelisted)
-├── app.module.ts      # Config + Identity + Catalog + InventoryHttp + InventoryWorker
+├── app.module.ts      # Config + Identity + Catalog + InventoryHttp + Orders + InventoryWorker
 ├── config/            # registerAs: auth, identity-mail, inventory
 ├── platform/database/ # PrismaService, generated client
 └── modules/
@@ -40,7 +40,8 @@ src/
     ├── shops/         # shop, chủ shop, trạng thái bán
     ├── catalog/       # category, brand, product/variant, duyệt, báo giá
     ├── media/         # upload ảnh, thumbnail
-    └── inventory/     # kho, tồn kho, reservation
+    ├── inventory/     # kho, tồn kho, reservation
+    └── orders/        # checkout, đơn hàng, vòng đời đơn
 ```
 
 Mỗi module có các thư mục `contracts/ domain/ application/ infrastructure/ presentation/` và file `<tên>.module.ts`. Chỉ tạo thư mục con khi thực sự có code. Inventory tách wiring thành `inventory.module.ts` (core), `inventory.http.module.ts` (controller) và `inventory.worker.module.ts` (job), dùng chung application/domain.
@@ -58,11 +59,11 @@ Mỗi module có các thư mục `contracts/ domain/ application/ infrastructure
 | `MEDIA_ASSETS` | Media | `resolveForShop`: kiểm tra quyền, lấy URL chuẩn của ảnh theo `assetId` |
 | `CATALOG_PRICING` | Catalog | Báo giá hiện tại theo variant |
 | `CATALOG_VARIANTS` | Catalog | Cho biết variant thuộc shop nào |
-| `INVENTORY_RESERVATIONS` | Inventory | Giữ, xác nhận, xuất, huỷ hàng |
+| `INVENTORY_RESERVATIONS` | Inventory | Giữ, đọc (`get`), xác nhận, xuất, huỷ hàng (`release`, tuỳ chọn `refuseIfShipped`) |
 
 Các file `contracts/*.persistence.ts` chỉ dành cho tầng `infrastructure/` của module khác, vì chúng nhận `Prisma.TransactionClient`. Nhờ đó Catalog và Media không đọc thẳng bảng `User`, `Shop`, `MediaAsset`, `MediaUsage`: module sở hữu bảng viết truy vấn và luật, module gọi chỉ truyền transaction của mình vào.
 
-Không được có phụ thuộc vòng. Inventory phụ thuộc Catalog và Shops, nên Catalog không import Inventory; trạng thái còn/hết hàng vì vậy là một endpoint riêng của Inventory.
+Không được có phụ thuộc vòng. Orders phụ thuộc Catalog, Inventory, Shops và Identity; không module nào import Orders. Inventory phụ thuộc Catalog và Shops, nên Catalog không import Inventory; trạng thái còn/hết hàng vì vậy là một endpoint riêng của Inventory.
 
 **Trách nhiệm từng module:**
 - **Identity:** user, phiên và role. Không giữ thông tin shop hay đơn hàng; module khác chỉ tham chiếu `userId`.
@@ -70,7 +71,8 @@ Không được có phụ thuộc vòng. Inventory phụ thuộc Catalog và Sho
 - **Catalog:** nội dung bán và giá niêm yết. Không giữ tồn kho.
 - **Media:** file ảnh và việc ảnh đang được dùng ở đâu.
 - **Inventory:** nguồn sự thật duy nhất cho số lượng tồn.
-- **Chưa làm:** Cart (snapshot tạm, giá xác nhận lại khi đặt), Orders (vòng đời đơn, snapshot giá/địa chỉ), Payment (payment intent, webhook, đối soát; SDK của nhà cung cấp không lọt vào Orders), Notifications (gửi theo sự kiện, không đổi trạng thái đơn).
+- **Orders:** checkout và vòng đời đơn, snapshot giá/địa chỉ; giữ và xuất hàng qua `INVENTORY_RESERVATIONS`. Xem [Orders.md](./Orders.md).
+- **Chưa làm:** Cart (snapshot tạm, giá xác nhận lại khi đặt), Payment (payment intent, webhook, đối soát; SDK của nhà cung cấp không lọt vào Orders), Notifications (gửi theo sự kiện, không đổi trạng thái đơn).
 
 ### Phong cách domain
 
@@ -139,13 +141,15 @@ Mặc định cả hai chạy trong cùng tiến trình với API, an toàn khi 
 - Mỗi event cần có `eventId`, `eventType`, `version`, `occurredAt`, `aggregateId`, `payload`.
 - Thao tác chạm nhiều context ưu tiên outbox cộng retry, không dùng distributed transaction.
 
-## 7. Luồng đặt hàng (dự kiến)
+## 7. Luồng đặt hàng (Cart và Payment còn dự kiến)
+
+Luồng đã làm của Orders (không có Cart và Payment): [Orders.md](./Orders.md#3-luồng-đặt-hàng).
 
 ```text
 OrdersController -> CreateOrder
   -> CartReader -> CATALOG_PRICING (báo giá) -> INVENTORY_RESERVATIONS.reserve (idempotency key)
   -> OrderRepository (lưu snapshot giá) -> Payment port
-  thanh toán xong -> confirm;  giao hàng -> ship(warehouseId);  huỷ -> release
+  thanh toán xong -> confirm;  giao hàng -> ship(warehouseId);  huỷ -> release (refuseIfShipped)
   -> OrderCreated event -> Notifications
 ```
 
@@ -177,10 +181,11 @@ Ràng buộc:
 - Catalog: category dạng cây, brand, thuộc tính theo schema, revision và duyệt, audit, tìm kiếm tiếng Việt, cursor, báo giá.
 - Media: kiểm tra ảnh thật, thumbnail.
 - Inventory: nhiều kho, sổ biến động, reservation có TTL và idempotency, ship theo kho, worker hết hạn.
+- Orders: checkout idempotent tách đơn theo shop, vòng đời PLACED đến DELIVERED, huỷ, API cho người mua, chủ shop và ADMIN.
 - Test kiến trúc, integration trên SQLite, e2e.
 
 **Tiếp theo:**
-1. Cart và Orders, dựa trên `CATALOG_PRICING` và `INVENTORY_RESERVATIONS`.
+1. Cart, đưa vào checkout của Orders.
 2. Payment qua port: webhook idempotent, đối soát.
 3. Integration events, Notifications, request ID và tracing.
 4. Object storage/CDN cho ảnh, xếp hạng tìm kiếm, cache khi đo tải thấy cần.

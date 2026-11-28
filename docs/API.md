@@ -1,6 +1,6 @@
 # API: Identity và Inventory
 
-Base URL `http://localhost:3000`, không có tiền tố `/api`. Body là JSON. Route cần đăng nhập nhận `Authorization: Bearer <accessToken>`; refresh token không dùng thay access token được. Field không khai báo trong DTO bị trả `400`. Catalog, Shops và Media nằm trong [Catalog.md](./Catalog.md#6-api).
+Base URL `http://localhost:3000`, không có tiền tố `/api`. Body là JSON. Route cần đăng nhập nhận `Authorization: Bearer <accessToken>`; refresh token không dùng thay access token được. Field không khai báo trong DTO bị trả `400`. Catalog, Shops và Media nằm trong [Catalog.md](./Catalog.md#6-api); Orders trong [Orders.md](./Orders.md#4-api).
 
 ## Identity
 
@@ -172,7 +172,7 @@ Stock: `{id, warehouseId, variantId, onHand, reserved, available, version, updat
 
 ### Reservation (contract cho Orders)
 
-Token `INVENTORY_RESERVATIONS`, import từ `inventory/contracts/inventory.api.ts`. Chưa có endpoint HTTP cho các thao tác này.
+Token `INVENTORY_RESERVATIONS`, import từ `inventory/contracts/inventory.api.ts`. Chưa có endpoint HTTP cho các thao tác này. Module [Orders](./Orders.md) là bên gọi.
 
 - **`reserve({idempotencyKey, reference, lines:[{variantId, quantity}]})`:**
   - Nhận 1–100 variant khác nhau, mỗi dòng số lượng 1–999.
@@ -181,12 +181,13 @@ Token `INVENTORY_RESERVATIONS`, import từ `inventory/contracts/inventory.api.t
   - Đủ hàng cho mọi dòng thì giữ hết, thiếu một dòng thì không giữ gì.
   - Trạng thái `ACTIVE`, tự hết hạn sau `INVENTORY_RESERVATION_TTL_SECONDS` (mặc định 900).
 - **Idempotency:** gửi lại cùng key với cùng nội dung thì nhận lại đúng kết quả cũ; cùng key mà nội dung khác thì trả `IDEMPOTENCY_CONFLICT`.
+- **`get(id)`:** đọc trạng thái và phân bổ hiện tại, không đổi gì.
 - **`confirm(id)`:** chuyển sang `ALLOCATED`, không còn hết hạn. Gọi lại an toàn; gọi khi đã hết hạn thì trả `INVALID_RESERVATION_STATE`.
 - **`ship(id, warehouseId)`:**
   - Xuất phần hàng của một kho: `onHand` và `reserved` cùng giảm.
   - Khi mọi kho đã xuất, trạng thái thành `SHIPPED`.
   - Chỉ dùng được sau `confirm`.
-- **`release(id)`:** trả lại phần chưa xuất và chuyển sang `RELEASED`. Gọi lại an toàn.
+- **`release(id, { refuseIfShipped? })`:** trả lại phần chưa xuất và chuyển sang `RELEASED`. Gọi lại an toàn. Với `refuseIfShipped: true`, nếu đã có kho nào xuất thì trả `INVALID_RESERVATION_STATE` và không trả hàng; kiểm tra nằm trong cùng transaction với việc trả hàng (Orders dùng khi huỷ).
 - **Hết hạn:** worker chạy mỗi `INVENTORY_EXPIRY_SWEEP_MS` (mặc định 30 giây), chuyển reservation `ACTIVE` quá hạn sang `EXPIRED` và trả hàng lại kho.
 - **Kết quả:** `{reservationId, reference, status, expiresAt, allocations:[{variantId, warehouseId, quantity, shipped}]}`.
 
