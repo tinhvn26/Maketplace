@@ -24,6 +24,8 @@ model User {
   sessions        AuthSession[]
   accountActions  AccountAction[]
   shops           Shop[]
+  orderCheckouts  OrderCheckout[]
+  orders          Order[]
 
   @@index([deletedAt])
   @@index([role, status, deletedAt])
@@ -157,6 +159,7 @@ model CatalogVariant {
   images      Json             @default("[]")
   product     CatalogProduct   @relation(fields: [productId], references: [id], onDelete: Cascade)
   stocks      InventoryStock[]
+  orderLines  OrderLine[]
 
   @@index([productId, isActive])
 }
@@ -173,6 +176,7 @@ model Shop {
   owner      User                 @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   products   CatalogProduct[]
   warehouses InventoryWarehouse[]
+  orders     Order[]
 
   @@index([ownerId, status])
 }
@@ -322,4 +326,68 @@ model InventoryReservationLine {
   reservation   InventoryReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
   @@index([reservationId])
+}
+
+model OrderCheckout {
+  id             String   @id
+  buyerId        String
+  idempotencyKey String
+  requestHash    String
+  createdAt      DateTime @default(now())
+  buyer          User     @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  orders         Order[]
+
+  @@unique([buyerId, idempotencyKey])
+}
+
+model Order {
+  id             String        @id
+  checkoutId     String
+  buyerId        String
+  shopId         String?
+  status         String
+  reservationId  String        @unique
+  subtotalAmount Int
+  currency       String        @default("VND")
+  recipientName  String
+  phoneNumber    String
+  addressLine    String
+  note           String?
+  cancelReason   String?
+  cancelledBy    String?
+  version        Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  confirmedAt    DateTime?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  cancelledAt    DateTime?
+  checkout       OrderCheckout @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
+  buyer          User          @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  shop           Shop?         @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  lines          OrderLine[]
+
+  @@index([buyerId, createdAt])
+  @@index([shopId, status, createdAt])
+  @@index([checkoutId])
+}
+
+model OrderLine {
+  id              String         @id
+  orderId         String
+  variantId       String
+  position        Int
+  productId       String
+  productName     String
+  variantName     String
+  sku             String
+  quantity        Int
+  unitPriceAmount Int
+  lineTotalAmount Int
+  productVersion  Int
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  variant         CatalogVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, variantId])
+  @@unique([orderId, position])
 }

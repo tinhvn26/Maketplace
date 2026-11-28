@@ -95,6 +95,9 @@ export async function createIdentityTestApp(imports: Type<unknown>[] = []) {
       };
     },
     async reset() {
+      await prisma.orderLine.deleteMany();
+      await prisma.order.deleteMany();
+      await prisma.orderCheckout.deleteMany();
       // Inventory rows reference variants and shops with ON DELETE RESTRICT.
       await prisma.inventoryReservation.deleteMany();
       await prisma.inventoryMovement.deleteMany();
