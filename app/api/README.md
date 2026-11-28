@@ -1,6 +1,6 @@
 # Marketplate API
 
-Backend NestJS 12 + Prisma 7 + SQLite, tổ chức theo kiểu modular monolith với các module `identity`, `shops`, `catalog`, `media` và `inventory`. Tổng quan dự án ở [README gốc](../../README.md). Hướng dẫn từng bước cho PowerShell ở [docs/installation.md](../../docs/installation.md).
+Backend NestJS 12 + Prisma 7 + SQLite, tổ chức theo kiểu modular monolith với các module `identity`, `shops`, `catalog`, `media`, `inventory` và `orders`. Tổng quan dự án ở [README gốc](../../README.md). Hướng dẫn từng bước cho PowerShell ở [docs/installation.md](../../docs/installation.md).
 
 ## Cài và chạy
 
@@ -40,6 +40,7 @@ Khi lấy code mới về, chạy lại `npm run db:generate` và `npm run db:de
 | `MEDIA_PUBLIC_BASE_URL` | `http://localhost:3000` | Origin dùng trong URL ảnh trả về |
 | `INVENTORY_RESERVATION_TTL_SECONDS` | `900` | Thời gian giữ hàng khi chưa xác nhận |
 | `INVENTORY_EXPIRY_SWEEP_MS` | `30000` | Chu kỳ worker giải phóng hàng giữ quá hạn |
+| `INVENTORY_EMBEDDED_WORKER` | `true` | `false` thì API không tự chạy worker; chạy riêng bằng `npm run start:worker` sau `npm run build` |
 
 ## Admin đầu tiên
 
@@ -87,5 +88,6 @@ Trên Windows, chạy test từ đường dẫn có chữ ổ đĩa viết hoa (
 
 - [docs/API.md](../../docs/API.md): endpoint Identity
 - [docs/Catalog.md](../../docs/Catalog.md): Catalog
+- [docs/Orders.md](../../docs/Orders.md): Orders
 - [docs/struct.md](../../docs/struct.md): cấu trúc module, gồm Inventory
 - [docs/Architecture.md](../../docs/Architecture.md): kiến trúc và lộ trình
