@@ -31,3 +31,10 @@ export interface CatalogPricing {
     quotedAt: Date;
   }>;
 }
+
+export {
+  CatalogConflictError,
+  CatalogNotFoundError,
+  CatalogValidationError,
+  CatalogVersionConflictError,
+} from '../domain/errors/catalog.errors.js';
