@@ -70,6 +70,14 @@ describe('InventoryReservationService', () => {
       lines: [{ variantId: 'v1', quantity }],
     });
 
+  it('reads a reservation without changing it', async () => {
+    const held = await reserve(2);
+    await expect(service.get(held.reservationId)).resolves.toEqual(held);
+    await expect(service.get('missing')).rejects.toThrow(
+      InventoryNotFoundError,
+    );
+  });
+
   it('splits one line across warehouses by priority and records the holds', async () => {
     const result = await reserve(7);
     expect(result).toMatchObject({
@@ -163,6 +171,20 @@ describe('InventoryReservationService', () => {
     expect(stockOf('wb')).toMatchObject({ onHand: 4, reserved: 0 });
     const movements = store.movements.length;
     expect((await service.release(reservationId)).status).toBe('RELEASED');
+    expect(store.movements).toHaveLength(movements);
+  });
+
+  it('refuses to release a partly shipped reservation when asked to', async () => {
+    const { reservationId } = await reserve(7);
+    await service.confirm(reservationId);
+    await service.ship(reservationId, 'wa');
+    const movements = store.movements.length;
+
+    await expect(
+      service.release(reservationId, { refuseIfShipped: true }),
+    ).rejects.toThrow(ReservationStateError);
+    expect((await service.get(reservationId)).status).toBe('ALLOCATED');
+    expect(stockOf('wb')).toMatchObject({ onHand: 4, reserved: 2 });
     expect(store.movements).toHaveLength(movements);
   });
 

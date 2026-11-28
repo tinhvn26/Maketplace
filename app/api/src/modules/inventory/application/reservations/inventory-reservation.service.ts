@@ -29,6 +29,7 @@ import {
   InventoryNotFoundError,
   InventoryConflictError,
   InventoryValidationError,
+  ReservationStateError,
 } from '../../domain/errors/inventory.errors.js';
 import {
   inventoryId,
@@ -134,6 +135,13 @@ export class InventoryReservationService implements InventoryReservations {
     );
   }
 
+  async get(reservationId: string): Promise<ReservationResult> {
+    const id = inventoryId(reservationId, 'reservation identifier');
+    return this.unitOfWork.read(async (tx) =>
+      this.toResult(await this.load(tx, id)),
+    );
+  }
+
   confirm(reservationId: string): Promise<ReservationResult> {
     const id = inventoryId(reservationId, 'reservation identifier');
     return retryOnConflict(() =>
@@ -146,11 +154,22 @@ export class InventoryReservationService implements InventoryReservations {
     );
   }
 
-  release(reservationId: string): Promise<ReservationResult> {
+  release(
+    reservationId: string,
+    options: { refuseIfShipped?: boolean } = {},
+  ): Promise<ReservationResult> {
     const id = inventoryId(reservationId, 'reservation identifier');
     return retryOnConflict(() =>
       this.unitOfWork.run(async (tx) => {
         const current = await this.load(tx, id);
+        // Checked in the same transaction as the release, so a concurrent ship cannot slip in between.
+        if (
+          options.refuseIfShipped &&
+          current.lines.some((line) => line.shippedAt !== null)
+        )
+          throw new ReservationStateError(
+            'Part of the reservation has already shipped',
+          );
         const now = this.clock.now();
         const { reservation, released } = releaseReservation(current, now);
         if (reservation === current) return this.toResult(current);
